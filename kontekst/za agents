@@ -1,0 +1,162 @@
+from this generate a agents.md file so i can create a react app that will use supabase as the backend. all variables and code comments should be in slovenian. 
+
+the agents md should probably be in english so the model understands it better. the below is the plain slovenian what the user wants. here i think that we will need to generate a connection between rooms and a generated users as else when the user changes he would be able to see all costs for the previous renters of the rooms...
+
+
+
+the app will probably be hosted on cloudflare pages, github code supabase db. first i will need th  agent to generate a beautiful react page which is not just plain crap and basic. of course the owner then needs to see the whole table, all costs and so on. and the owner can also add users and disable old ones somewhere in the app (like a admin option). probably you should use mui so the design is constant. used should be the most recent coding and designing guidelines that are in use for the best apps that exist.
+
+
+
+''''
+
+Zaenkrat sm prpravla excel tabelo.
+Želim nekakšno web aplikacijo oz spletni obrazec, kamor bi se najemnik najprej logiral z imenom sobe in dodeljenim geslom. 
+ 
+Nato bi se mu prikazal interface s pozdravnim napisom :
+“Pozdravljen-a! Danes je dober dan za izračun mesečnih stroškov 😊”
+In z enim ali dvema okencema za vnos stanja elektrike in vode (dve okenci za veliko hišo in eno okence za staro hišo - torej odvisno od imena sobe), pod tem pa gumb IZRAČUN
+Stanje elektrike:___________________(kWh, zapis brez decimalnih mest) … to okence bi se prikazalo za vse sobe
+Stanje vode: _________________ (l, zapis brez decimalnih mest) … to okence bi se prikazalo le za sobe v veliki hiši oz. se lahko prikaže tudi za sobe v stari hiši, le da je zaklenjeno/sivo/ne omogoča vnosa
+ 
+Nato bi uporabnik kliknil na “IZRAČUN” in pod tem bi se prikazala vsota vseh mesečnih obveznosti.
+Ob pritisku na gumb “IZRAČUN” bi se vneseni stanji elektrike in vode shranili v bazo.
+ 
+Bi pa moralo biti tako narejeno, da preden jaz v bazo ne bi vpisala mesečnega stroška ogrevanja, jih sistem ne bi spustil naprej oz. bi ob pritisku na “IZRAČUN” najemniku javil napako v pop-up sporočilu: “Najemodajalec še ni izračunal stroška ogrevanja, poskusi ponovno jutri.” 
+ 
+Krasen dodatek bi bil tud gumb IZPIS pod vsoto, ki bi najemniku razčlenil skupno vsoto. In morda gumb ZGODOVINA, kjer bi si lahko najemnik ogledal svoje pretekle stroške. Ampak to ni tok nujno, glavna stvar je izračun stroškov za najemnika in evidenca zame.
+
+Izgled te aplikacije bi moral biti prilagojen ekranu pametnega telefona, ker računalnikov nimajo vsi najemnik, telefončke pa ja.
+
+''''''''''
+
+
+
+the database should also be in slovenian 
+
+
+
+
+
+and should contain data like this (of cours ewe need to generate the tables in supabase (i suppose this can also be generated via API?)
+
+
+
+Mesec	Leto	Soba	Datum vnosa stanja oz. datum plačila	Voda stanje	Voda cena	Elektrika stanje	Elektrika cena	Najemnina	Skupni	Voda	Elektrika	Ogrevanje	Net, TV	Fiksni	SKUPAJ
+
+februar	2026	SH1				10000	0.25								482
+
+februar	2026	SH2					0.25								0
+
+februar	2026	SH3					0.25								0
+
+februar	2026	SH4					0.25								0
+
+februar	2026	SH5					0.25								0
+
+februar	2026	SH6					0.25								0
+
+februar	2026	K1			0.18		0.22								0
+
+februar	2026	K2			0.18		0.22								0
+
+februar	2026	K3			0.18		0.22								0
+
+februar	2026	K4			0.18		0.22								0
+
+februar	2026	K5			0.18		0.22								0
+
+februar	2026	K6			0.18		0.22								0
+
+februar	2026	P1			0.18		0.22								0
+
+februar	2026	P2			0.18		0.22								0
+
+februar	2026	P3			0.18		0.22								0
+
+februar	2026	P4			0.18		0.22								0
+
+februar	2026	P5			0.18		0.22								0
+
+februar	2026	P6			0.18		0.22								0
+
+februar	2026	P7			0.18		0.22								0
+
+februar	2026	M1			0.18		0.22								0
+
+februar	2026	M2			0.18		0.22								0
+
+februar	2026	M3			0.18		0.22								0
+
+februar	2026	M4			0.18		0.22								0
+
+februar	2026	M5			0.18		0.22								0
+
+februar	2026	M6			0.18		0.22								0
+
+februar	2026	M7			0.18		0.22								0
+
+februar	2026	S1			0.18		0.22								0
+
+februar	2026	S2			0.18		0.22								0
+
+februar	2026	S3			0.18		0.22								0
+
+marec	2026	SH1				10100	0.25	380	20	7	25	50	0	0	482
+
+marec	2026	SH2					0.25				0				0
+
+marec	2026	SH3					0.25				0				0
+
+marec	2026	SH4					0.25				0				0
+
+marec	2026	SH5					0.25				0				0
+
+marec	2026	SH6					0.25				0				0
+
+marec	2026	K1			0.18		0.22			0	0				0
+
+marec	2026	K2			0.18		0.22			0	0				0
+
+marec	2026	K3			0.18		0.22			0	0				0
+
+marec	2026	K4			0.18		0.22			0	0				0
+
+marec	2026	K5			0.18		0.22			0	0				0
+
+marec	2026	K6			0.18		0.22			0	0				0
+
+marec	2026	P1			0.18		0.22			0	0				0
+
+marec	2026	P2			0.18		0.22			0	0				0
+
+marec	2026	P3			0.18		0.22			0	0				0
+
+marec	2026	P4			0.18		0.22			0	0				0
+
+marec	2026	P5			0.18		0.22			0	0				0
+
+marec	2026	P6			0.18		0.22			0	0				0
+
+marec	2026	P7			0.18		0.22			0	0				0
+
+marec	2026	M1			0.18		0.22			0	0				0
+
+marec	2026	M2			0.18		0.22			0	0				0
+
+marec	2026	M3			0.18		0.22			0	0				0
+
+marec	2026	M4			0.18		0.22			0	0				0
+
+marec	2026	M5			0.18		0.22			0	0				0
+
+marec	2026	M6			0.18		0.22			0	0				0
+
+marec	2026	M7			0.18		0.22			0	0				0
+
+marec	2026	S1			0.18		0.22			0	0				0
+
+marec	2026	S2			0.18		0.22			0	0				0
+
+marec	2026	S3			0.18		0.22			0	0				0
+

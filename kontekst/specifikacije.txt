@@ -1,0 +1,17 @@
+Zaenkrat sm prpravla excel tabelo.
+Želim nekakšno web aplikacijo oz spletni obrazec, kamor bi se najemnik najprej logiral z imenom sobe in dodeljenim geslom. 
+ 
+Nato bi se mu prikazal interface s pozdravnim napisom :
+“Pozdravljen-a! Danes je dober dan za izračun mesečnih stroškov 😊”
+In z enim ali dvema okencema za vnos stanja elektrike in vode (dve okenci za veliko hišo in eno okence za staro hišo - torej odvisno od imena sobe), pod tem pa gumb IZRAČUN
+Stanje elektrike:___________________(kWh, zapis brez decimalnih mest) … to okence bi se prikazalo za vse sobe
+Stanje vode: _________________ (l, zapis brez decimalnih mest) … to okence bi se prikazalo le za sobe v veliki hiši oz. se lahko prikaže tudi za sobe v stari hiši, le da je zaklenjeno/sivo/ne omogoča vnosa
+ 
+Nato bi uporabnik kliknil na “IZRAČUN” in pod tem bi se prikazala vsota vseh mesečnih obveznosti.
+Ob pritisku na gumb “IZRAČUN” bi se vneseni stanji elektrike in vode shranili v bazo.
+ 
+Bi pa moralo biti tako narejeno, da preden jaz v bazo ne bi vpisala mesečnega stroška ogrevanja, jih sistem ne bi spustil naprej oz. bi ob pritisku na “IZRAČUN” najemniku javil napako v pop-up sporočilu: “Najemodajalec še ni izračunal stroška ogrevanja, poskusi ponovno jutri.” 
+ 
+Krasen dodatek bi bil tud gumb IZPIS pod vsoto, ki bi najemniku razčlenil skupno vsoto. In morda gumb ZGODOVINA, kjer bi si lahko najemnik ogledal svoje pretekle stroške. Ampak to ni tok nujno, glavna stvar je izračun stroškov za najemnika in evidenca zame.
+
+Izgled te aplikacije bi moral biti prilagojen ekranu pametnega telefona, ker računalnikov nimajo vsi najemnik, telefončke pa ja.
