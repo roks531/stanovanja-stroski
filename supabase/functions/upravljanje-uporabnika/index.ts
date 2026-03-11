@@ -8,10 +8,14 @@ type Vhod = {
   email: string;
   geslo?: string;
   soba_id?: string | null;
+  zacetno_stanje_elektrike?: number | string | null;
+  zacetno_stanje_vode?: number | string | null;
   admin?: boolean;
   aktiven?: boolean;
   uporabnik_od?: string;
   uporabnik_do?: string | null;
+  pogodba_od?: string | null;
+  pogodba_do?: string | null;
   posodobil?: string | null;
 };
 
@@ -19,7 +23,8 @@ const PRIVZETI_DOVOLJENI_ORIGINI = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://127.0.0.1:5173',
-  'http://127.0.0.1:5174'
+  'http://127.0.0.1:5174',
+  'https://stanovanja-stroski.pages.dev'
 ];
 
 type CorsNastavitve = {
@@ -114,6 +119,21 @@ function datumNizAliNull(vrednost: unknown) {
   if (vrednost == null) return null;
   const niz = String(vrednost).trim();
   return niz || null;
+}
+
+function steviloAliNull(vrednost: unknown) {
+  if (vrednost == null) return null;
+  const niz = String(vrednost).trim();
+  if (!niz) return null;
+  const parsed = Number(niz);
+  if (!Number.isFinite(parsed) || parsed < 0) return Number.NaN;
+  return parsed;
+}
+
+function jeNapakaManjkajocaKolonaZacetnihStanj(sporocilo: string | undefined) {
+  const niz = String(sporocilo ?? '').toLowerCase();
+  return niz.includes('column') &&
+    (niz.includes('zacetno_stanje_elektrike') || niz.includes('zacetno_stanje_vode'));
 }
 
 Deno.serve(async (req) => {
@@ -219,14 +239,31 @@ Deno.serve(async (req) => {
   });
 
   let uporabnikId = vhod.id;
-  let obstojeciProfil: { aktiven: boolean; uporabnik_do: string | null } | null = null;
+  let obstojeciProfil: {
+    aktiven: boolean;
+    uporabnik_do: string | null;
+    zacetno_stanje_elektrike: number | null;
+    zacetno_stanje_vode: number | null;
+  } | null = null;
 
   if (uporabnikId) {
-    const { data: profil, error: napakaProfila } = await adminClient
+    let { data: profil, error: napakaProfila } = await adminClient
       .from('uporabniki')
-      .select('aktiven, uporabnik_do')
+      .select('aktiven, uporabnik_do, zacetno_stanje_elektrike, zacetno_stanje_vode')
       .eq('id', uporabnikId)
       .maybeSingle();
+
+    if (napakaProfila && jeNapakaManjkajocaKolonaZacetnihStanj(napakaProfila.message)) {
+      const fallback = await adminClient
+        .from('uporabniki')
+        .select('aktiven, uporabnik_do')
+        .eq('id', uporabnikId)
+        .maybeSingle();
+      profil = fallback.data as
+        | { aktiven: boolean; uporabnik_do: string | null; zacetno_stanje_elektrike?: null; zacetno_stanje_vode?: null }
+        | null;
+      napakaProfila = fallback.error;
+    }
 
     if (napakaProfila) {
       return json(req, cors, { napaka: napakaProfila.message }, 400);
@@ -267,6 +304,14 @@ Deno.serve(async (req) => {
   const aktiven = vhod.aktiven ?? obstojeciProfil?.aktiven ?? true;
   const danes = new Date().toISOString().slice(0, 10);
   const vhodUporabnikDo = datumNizAliNull(vhod.uporabnik_do);
+  const zacetnoStanjeElektrike = steviloAliNull(vhod.zacetno_stanje_elektrike);
+  const zacetnoStanjeVode = steviloAliNull(vhod.zacetno_stanje_vode);
+  if (Number.isNaN(zacetnoStanjeElektrike)) {
+    return json(req, cors, { napaka: 'Začetno stanje elektrike mora biti 0 ali več.' }, 400);
+  }
+  if (Number.isNaN(zacetnoStanjeVode)) {
+    return json(req, cors, { napaka: 'Začetno stanje vode mora biti 0 ali več.' }, 400);
+  }
   const uporabnikDo = aktiven
     ? null
     : vhodUporabnikDo ?? obstojeciProfil?.uporabnik_do ?? danes;
@@ -278,14 +323,28 @@ Deno.serve(async (req) => {
     priimek,
     telefon: vhod.telefon ?? null,
     email,
+    zacetno_stanje_elektrike: zacetnoStanjeElektrike ?? obstojeciProfil?.zacetno_stanje_elektrike ?? null,
+    zacetno_stanje_vode: zacetnoStanjeVode ?? obstojeciProfil?.zacetno_stanje_vode ?? null,
     aktiven,
     admin: vhod.admin ?? false,
     uporabnik_od: datumNizAliNull(vhod.uporabnik_od) ?? danes,
     uporabnik_do: uporabnikDo,
+    pogodba_od: datumNizAliNull(vhod.pogodba_od),
+    pogodba_do: datumNizAliNull(vhod.pogodba_do),
     posodobil: caller.id
   };
 
-  const { error: profilError } = await adminClient.from('uporabniki').upsert(payload, { onConflict: 'id' });
+  let { error: profilError } = await adminClient.from('uporabniki').upsert(payload, { onConflict: 'id' });
+
+  if (profilError && jeNapakaManjkajocaKolonaZacetnihStanj(profilError.message)) {
+    const {
+      zacetno_stanje_elektrike: _ignoreElektrika,
+      zacetno_stanje_vode: _ignoreVoda,
+      ...legacyPayload
+    } = payload;
+    const fallback = await adminClient.from('uporabniki').upsert(legacyPayload, { onConflict: 'id' });
+    profilError = fallback.error;
+  }
 
   if (profilError) {
     return json(req, cors, { napaka: profilError.message }, 400);

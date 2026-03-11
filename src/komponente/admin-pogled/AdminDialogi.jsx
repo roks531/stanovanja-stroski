@@ -85,7 +85,7 @@ export default function AdminDialogi({
             )}
             {dialogPotrdiVse.stevilo > 0 && (
               <Typography variant="body2" color="text.secondary">
-                Vsi odprti obračuni v trenutnem filtriranem pogledu bodo nastavljeni na status <strong>Potrjeno</strong> z današnjim datumom plačila.
+                Vsi odprti obračuni v trenutnem filtriranem pogledu bodo nastavljeni na status <strong>Potrjeno</strong> z današnjim datumom obračuna.
               </Typography>
             )}
           </Stack>

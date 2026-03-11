@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { razdeliOgrevanjePoSobah } from './ogrevanje';
+import dayjs from 'dayjs';
 
 const KONTAKT_LASTNIK_EMAIL = 'lastnik@example.com';
 
@@ -66,18 +67,209 @@ function napakaOgrevanjeNiPripravljeno(mesec, leto) {
   return `Najemodajalec še ni izračunal stroška ogrevanja za ${obdobje}, poskusi ponovno jutri. Kontakt: ${KONTAKT_LASTNIK_EMAIL}`;
 }
 
+function formatObdobje(mesec, leto) {
+  return `${String(mesec).padStart(2, '0')}.${leto}`;
+}
+
+function jeObdobjePred(letoA, mesecA, letoB, mesecB) {
+  if (Number(letoA) !== Number(letoB)) return Number(letoA) < Number(letoB);
+  return Number(mesecA) < Number(mesecB);
+}
+
+// Backward-compat helperji: omogočijo delovanje tudi na starejši shemi baze.
+function jeNapakaManjkajoceSnapshotKolone(error) {
+  const sporocilo = String(error?.message ?? '').toLowerCase();
+  return sporocilo.includes('column') && (sporocilo.includes('cena_elektrike') || sporocilo.includes('cena_vode'));
+}
+
+function jeNapakaManjkajocihKolonZacetnihStanj(error) {
+  const sporocilo = String(error?.message ?? '').toLowerCase();
+  return sporocilo.includes('column') &&
+    (sporocilo.includes('zacetno_stanje_elektrike') || sporocilo.includes('zacetno_stanje_vode'));
+}
+
+function jeNapakaManjkajocePogodbaOdKolone(error) {
+  const sporocilo = String(error?.message ?? '').toLowerCase();
+  return sporocilo.includes('column') && sporocilo.includes('pogodba_od');
+}
+
+function izracunajZacetnoObdobjeUporabnika(uporabnik) {
+  const zacetekUporabnikOd = uporabnik?.uporabnik_od ? dayjs(uporabnik.uporabnik_od) : null;
+  const zacetekPogodbaOd = uporabnik?.pogodba_od ? dayjs(uporabnik.pogodba_od) : null;
+  const uporabnikOdVeljaven = Boolean(zacetekUporabnikOd?.isValid());
+  const pogodbaOdVeljaven = Boolean(zacetekPogodbaOd?.isValid());
+
+  if (!uporabnikOdVeljaven && !pogodbaOdVeljaven) return null;
+  if (!uporabnikOdVeljaven) return zacetekPogodbaOd.startOf('month');
+  if (!pogodbaOdVeljaven) return zacetekUporabnikOd.startOf('month');
+  return zacetekPogodbaOd.isAfter(zacetekUporabnikOd)
+    ? zacetekPogodbaOd.startOf('month')
+    : zacetekUporabnikOd.startOf('month');
+}
+
+// Najemnik ne sme oddajati obračuna pred svojim začetnim obdobjem (uporabnik_od/pogodba_od).
+async function preveriNajemnikovoObdobjeVnosa(uporabnikId, mesec, leto) {
+  let { data: uporabnik, error } = await supabase
+    .from('uporabniki')
+    .select('uporabnik_od, pogodba_od')
+    .eq('id', uporabnikId)
+    .maybeSingle();
+
+  if (error && jeNapakaManjkajocePogodbaOdKolone(error)) {
+    const fallback = await supabase
+      .from('uporabniki')
+      .select('uporabnik_od')
+      .eq('id', uporabnikId)
+      .maybeSingle();
+    uporabnik = fallback.data;
+    error = fallback.error;
+  }
+
+  if (error) throw new Error(error.message);
+  if (!uporabnik) throw new Error('Uporabnik ni določen.');
+
+  const dovoljenoOd = izracunajZacetnoObdobjeUporabnika(uporabnik);
+  if (!dovoljenoOd?.isValid()) return;
+
+  const ciljnoObdobje = dayjs(`${leto}-${String(mesec).padStart(2, '0')}-01`);
+  if (!ciljnoObdobje.isValid()) return;
+
+  if (ciljnoObdobje.isBefore(dovoljenoOd, 'month')) {
+    throw new Error(
+      `Za obdobje ${formatObdobje(mesec, leto)} ne moreš oddati števcev ali potrditi obračuna. ` +
+      `Prvo dovoljeno obdobje je ${formatObdobje(dovoljenoOd.month() + 1, dovoljenoOd.year())}.`
+    );
+  }
+}
+
+async function jeObracunPotrjenZaSoboObdobje(sobaId, mesec, leto) {
+  const { data, error } = await supabase
+    .from('placila')
+    .select('id')
+    .eq('soba_id', sobaId)
+    .eq('mesec', mesec)
+    .eq('leto', leto)
+    .eq('placano', true)
+    .limit(1);
+  if (error) throw new Error(error.message);
+  return Boolean(data?.length);
+}
+
+// Potrjen obračun zaklene obdobje: odčitkov in stroškov za to obdobje ne dovolimo več spreminjati.
+async function preveriOdklenjenoObdobjeSobe(sobaId, mesec, leto) {
+  const jePotrjen = await jeObracunPotrjenZaSoboObdobje(sobaId, mesec, leto);
+  if (jePotrjen) {
+    throw new Error('Obračun za to sobo in obdobje je že potrjen, zato odčitka ni več mogoče spreminjati.');
+  }
+}
+
+async function obstajaPotrjenObracunZaTipInObdobje(tipHise, mesec, leto) {
+  const { data: placila, error: napakaPlacila } = await supabase
+    .from('placila')
+    .select('soba_id')
+    .eq('mesec', mesec)
+    .eq('leto', leto)
+    .eq('placano', true);
+  if (napakaPlacila) throw new Error(napakaPlacila.message);
+  const sobeIds = (placila ?? []).map((p) => p.soba_id).filter(Boolean);
+  if (sobeIds.length === 0) return false;
+
+  const { data: sobe, error: napakaSobe } = await supabase
+    .from('sobe')
+    .select('id')
+    .in('id', sobeIds)
+    .eq('tip_hise', tipHise)
+    .limit(1);
+  if (napakaSobe) throw new Error(napakaSobe.message);
+  return Boolean(sobe?.length);
+}
+
+async function pridobiPretekliOdcitekSobe(sobaId, mesec, leto) {
+  const { data: vsiOdcitki, error: napakaVsi } = await supabase
+    .from('odcitki')
+    .select('mesec, leto, stanje_elektrike, stanje_vode')
+    .eq('soba_id', sobaId)
+    .order('leto', { ascending: false })
+    .order('mesec', { ascending: false })
+    .limit(240);
+  if (napakaVsi) throw new Error(napakaVsi.message);
+  return (vsiOdcitki ?? []).find((o) => jeObdobjePred(o.leto, o.mesec, leto, mesec)) ?? null;
+}
+
+// Če uporabnik še nima svojih preteklih odčitkov, uporabimo njegova začetna stanja.
+async function uporabnikImaPrejsnjiOdcitek(sobaId, uporabnikId, mesec, leto) {
+  if (!uporabnikId) return false;
+  const { data: odcitkiUporabnika, error } = await supabase
+    .from('odcitki')
+    .select('mesec, leto')
+    .eq('soba_id', sobaId)
+    .eq('uporabnik_id', uporabnikId)
+    .order('leto', { ascending: false })
+    .order('mesec', { ascending: false })
+    .limit(240);
+  if (error) throw new Error(error.message);
+  return (odcitkiUporabnika ?? []).some((o) => jeObdobjePred(o.leto, o.mesec, leto, mesec));
+}
+
+async function pridobiZacetnaStanjaUporabnika(uporabnikId, sobaId) {
+  if (!uporabnikId) return null;
+  let { data, error } = await supabase
+    .from('uporabniki')
+    .select('soba_id, zacetno_stanje_elektrike, zacetno_stanje_vode')
+    .eq('id', uporabnikId)
+    .maybeSingle();
+  if (error && jeNapakaManjkajocihKolonZacetnihStanj(error)) {
+    const fallback = await supabase
+      .from('uporabniki')
+      .select('soba_id')
+      .eq('id', uporabnikId)
+      .maybeSingle();
+    data = fallback.data;
+    error = fallback.error;
+  }
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  if (data.soba_id && sobaId && data.soba_id !== sobaId) return null;
+  return {
+    zacetno_stanje_elektrike:
+      data.zacetno_stanje_elektrike == null ? null : Number(data.zacetno_stanje_elektrike),
+    zacetno_stanje_vode:
+      data.zacetno_stanje_vode == null ? null : Number(data.zacetno_stanje_vode)
+  };
+}
+
 export async function pridobiNajemnikPodatke(uporabnikId) {
-  const { data: uporabnik, error: napakaUporabnik } = await supabase
+  let { data: uporabnik, error: napakaUporabnik } = await supabase
     .from('uporabniki')
     .select(
       `
       id,
       soba_id,
+      uporabnik_od,
+      zacetno_stanje_elektrike,
+      zacetno_stanje_vode,
       sobe (*)
     `
     )
     .eq('id', uporabnikId)
     .single();
+
+  if (napakaUporabnik && jeNapakaManjkajocihKolonZacetnihStanj(napakaUporabnik)) {
+    const fallback = await supabase
+      .from('uporabniki')
+      .select(
+        `
+        id,
+        soba_id,
+        uporabnik_od,
+        sobe (*)
+      `
+      )
+      .eq('id', uporabnikId)
+      .single();
+    uporabnik = fallback.data;
+    napakaUporabnik = fallback.error;
+  }
 
   if (napakaUporabnik) {
     throw new Error(napakaUporabnik.message);
@@ -88,7 +280,12 @@ export async function pridobiNajemnikPodatke(uporabnikId) {
     throw new Error('Uporabniku ni dodeljena soba.');
   }
 
-  const [{ data: cene, error: napakaCene }, { data: placila, error: napakaPlacila }, { data: odcitki, error: napakaOdcitki }] = await Promise.all([
+  const [
+    { data: cene, error: napakaCene },
+    { data: placila, error: napakaPlacila },
+    { data: odcitkiSoba, error: napakaOdcitkiSoba },
+    { data: odcitkiUporabnika, error: napakaOdcitkiUporabnika }
+  ] = await Promise.all([
     supabase
       .from('cene')
       .select('*')
@@ -106,12 +303,52 @@ export async function pridobiNajemnikPodatke(uporabnikId) {
       .eq('soba_id', soba.id)
       .order('leto', { ascending: false })
       .order('mesec', { ascending: false })
+      .limit(60),
+    supabase
+      .from('odcitki')
+      .select('*')
+      .eq('soba_id', soba.id)
+      .eq('uporabnik_id', uporabnikId)
+      .order('leto', { ascending: false })
+      .order('mesec', { ascending: false })
       .limit(1)
   ]);
 
   if (napakaCene) throw new Error(napakaCene.message);
   if (napakaPlacila) throw new Error(napakaPlacila.message);
-  if (napakaOdcitki) throw new Error(napakaOdcitki.message);
+  if (napakaOdcitkiSoba) throw new Error(napakaOdcitkiSoba.message);
+  if (napakaOdcitkiUporabnika) throw new Error(napakaOdcitkiUporabnika.message);
+
+  const zadnjiOdcitekSobe = odcitkiSoba?.[0] ?? null;
+  const zadnjiOdcitekUporabnika = odcitkiUporabnika?.[0] ?? null;
+  let zadnjiOdcitek = zadnjiOdcitekUporabnika ?? zadnjiOdcitekSobe;
+
+  const imaZacetnaStanja =
+    uporabnik?.zacetno_stanje_elektrike != null || uporabnik?.zacetno_stanje_vode != null;
+
+  if (!zadnjiOdcitekUporabnika && imaZacetnaStanja) {
+    const elektrika = Number(
+      uporabnik.zacetno_stanje_elektrike ?? zadnjiOdcitekSobe?.stanje_elektrike ?? 0
+    );
+    const voda = sobaImaVodniStevec(soba)
+      ? Number(uporabnik.zacetno_stanje_vode ?? zadnjiOdcitekSobe?.stanje_vode ?? 0)
+      : null;
+    const zacetniDatum = uporabnik.uporabnik_od
+      ? dayjs(uporabnik.uporabnik_od)
+      : dayjs();
+
+    zadnjiOdcitek = {
+      id: `zacetno-${uporabnikId}`,
+      soba_id: soba.id,
+      uporabnik_id: uporabnikId,
+      mesec: zacetniDatum.month() + 1,
+      leto: zacetniDatum.year(),
+      prejsnje_stanje_elektrike: elektrika,
+      stanje_elektrike: elektrika,
+      prejsnje_stanje_vode: voda,
+      stanje_vode: voda
+    };
+  }
 
   const obdobjeZaVnos = prejsnjiMesecLeto();
   let strosekOgrevanja = Number(soba.strosek_ogrevanja ?? 0);
@@ -146,7 +383,7 @@ export async function pridobiNajemnikPodatke(uporabnikId) {
     soba,
     cene,
     placila,
-    zadnjiOdcitek: odcitki[0] ?? null,
+    zadnjiOdcitek: zadnjiOdcitek ?? null,
     strosekOgrevanja,
     obdobjeZaVnos,
     ogrevanjePripravljeno,
@@ -225,6 +462,7 @@ export async function shraniNajemnikovOdcitek(vrednosti, posodobil) {
   if (!uporabnikId) throw new Error('Uporabnik ni določen.');
   if (!Number.isFinite(mesec) || mesec < 1 || mesec > 12) throw new Error('Mesec ni veljaven.');
   if (!Number.isFinite(leto) || leto < 2024) throw new Error('Leto ni veljavno.');
+  await preveriNajemnikovoObdobjeVnosa(uporabnikId, mesec, leto);
   if (!Number.isFinite(stanjeElektrike) || stanjeElektrike < 0) {
     throw new Error('Stanje elektrike mora biti 0 ali več.');
   }
@@ -243,6 +481,8 @@ export async function shraniNajemnikovOdcitek(vrednosti, posodobil) {
     throw new Error(napakaOgrevanjeNiPripravljeno(mesec, leto));
   }
 
+  await preveriOdklenjenoObdobjeSobe(sobaId, mesec, leto);
+
   const { data: obstojeceObdobje, error: napakaObstojece } = await supabase
     .from('odcitki')
     .select('id, prejsnje_stanje_elektrike, prejsnje_stanje_vode')
@@ -256,19 +496,24 @@ export async function shraniNajemnikovOdcitek(vrednosti, posodobil) {
     throw new Error('Za izbrano obdobje je odčitek že vnesen. Spremembo lahko uredi najemodajalec.');
   }
 
-  const { data: vsiOdcitki, error: napakaVsi } = await supabase
-    .from('odcitki')
-    .select('mesec, leto, stanje_elektrike, stanje_vode')
-    .eq('soba_id', sobaId)
-    .order('leto', { ascending: false })
-    .order('mesec', { ascending: false })
-    .limit(60);
+  const pretekli = await pridobiPretekliOdcitekSobe(sobaId, mesec, leto);
+  const uporabnikImaZgodovino = await uporabnikImaPrejsnjiOdcitek(sobaId, uporabnikId, mesec, leto);
+  const zacetnaStanja = !uporabnikImaZgodovino
+    ? await pridobiZacetnaStanjaUporabnika(uporabnikId, sobaId)
+    : null;
 
-  if (napakaVsi) throw new Error(napakaVsi.message);
+  const prejsnjeStanjeElektrike =
+    zacetnaStanja?.zacetno_stanje_elektrike ?? pretekli?.stanje_elektrike ?? 0;
+  const prejsnjeStanjeVode = stanjeVodeZaShrambo === null
+    ? null
+    : (zacetnaStanja?.zacetno_stanje_vode ?? pretekli?.stanje_vode ?? 0);
 
-  const pretekli = (vsiOdcitki ?? []).find(
-    (o) => o.leto < leto || (o.leto === leto && o.mesec < mesec)
-  );
+  if (stanjeElektrike < Number(prejsnjeStanjeElektrike ?? 0)) {
+    throw new Error('Stanje elektrike ne sme biti manjše od začetnega/prejšnjega stanja.');
+  }
+  if (stanjeVodeZaShrambo != null && stanjeVodeZaShrambo < Number(prejsnjeStanjeVode ?? 0)) {
+    throw new Error('Stanje vode ne sme biti manjše od začetnega/prejšnjega stanja.');
+  }
 
   const payload = {
     soba_id: sobaId,
@@ -277,8 +522,8 @@ export async function shraniNajemnikovOdcitek(vrednosti, posodobil) {
     leto,
     stanje_elektrike: stanjeElektrike,
     stanje_vode: stanjeVodeZaShrambo,
-    prejsnje_stanje_elektrike: pretekli?.stanje_elektrike ?? 0,
-    prejsnje_stanje_vode: stanjeVodeZaShrambo === null ? null : (pretekli?.stanje_vode ?? 0),
+    prejsnje_stanje_elektrike: prejsnjeStanjeElektrike,
+    prejsnje_stanje_vode: prejsnjeStanjeVode,
     posodobil: posodobil ?? null
   };
 
@@ -303,6 +548,7 @@ export async function potrdiNajemnikovObracun(vrednosti, posodobil) {
   if (!uporabnikId) throw new Error('Uporabnik ni določen.');
   if (!Number.isFinite(mesec) || mesec < 1 || mesec > 12) throw new Error('Mesec ni veljaven.');
   if (!Number.isFinite(leto) || leto < 2024) throw new Error('Leto ni veljavno.');
+  await preveriNajemnikovoObdobjeVnosa(uporabnikId, mesec, leto);
 
   const { data: soba, error: napakaSoba } = await supabase
     .from('sobe')
@@ -404,6 +650,8 @@ export async function potrdiNajemnikovObracun(vrednosti, posodobil) {
     uporabnik_id: uporabnikId,
     mesec,
     leto,
+    cena_elektrike: Number(ceneTipa.cena_elektrike ?? 0),
+    cena_vode: Number(ceneTipa.cena_vode ?? 0),
     najemnina,
     strosek_elektrike: strosekElektrike,
     strosek_vode: strosekVode,
@@ -418,23 +666,48 @@ export async function potrdiNajemnikovObracun(vrednosti, posodobil) {
   };
 
   if (obstojeci?.id) {
-    const { data, error } = await supabase
+    const prviPoskus = await supabase
       .from('placila')
       .update(payload)
       .eq('id', obstojeci.id)
       .select()
       .single();
-    if (error) throw new Error(error.message);
-    return data;
+
+    if (!prviPoskus.error) return prviPoskus.data;
+    if (!jeNapakaManjkajoceSnapshotKolone(prviPoskus.error)) {
+      throw new Error(prviPoskus.error.message);
+    }
+
+    const { cena_elektrike, cena_vode, ...legacyPayload } = payload;
+    const drugiPoskus = await supabase
+      .from('placila')
+      .update(legacyPayload)
+      .eq('id', obstojeci.id)
+      .select()
+      .single();
+    if (drugiPoskus.error) throw new Error(drugiPoskus.error.message);
+    return drugiPoskus.data;
   }
 
-  const { data, error } = await supabase
+  const prviPoskus = await supabase
     .from('placila')
     .insert(payload)
     .select()
     .single();
-  if (error) throw new Error(error.message);
-  return data;
+
+  if (!prviPoskus.error) return prviPoskus.data;
+  if (!jeNapakaManjkajoceSnapshotKolone(prviPoskus.error)) {
+    throw new Error(prviPoskus.error.message);
+  }
+
+  const { cena_elektrike, cena_vode, ...legacyPayload } = payload;
+  const drugiPoskus = await supabase
+    .from('placila')
+    .insert(legacyPayload)
+    .select()
+    .single();
+  if (drugiPoskus.error) throw new Error(drugiPoskus.error.message);
+  return drugiPoskus.data;
 }
 
 export async function shraniAdminOdcitekSobe(vrednosti, posodobil) {
@@ -465,30 +738,18 @@ export async function shraniAdminOdcitekSobe(vrednosti, posodobil) {
     throw new Error('Stanje vode mora biti 0 ali več.');
   }
 
+  await preveriOdklenjenoObdobjeSobe(sobaId, mesec, leto);
+
   const { data: obstojeceObdobje, error: napakaObstojece } = await supabase
     .from('odcitki')
-    .select('id, uporabnik_id')
+    .select('id, uporabnik_id, prejsnje_stanje_elektrike, prejsnje_stanje_vode')
     .eq('soba_id', sobaId)
     .eq('mesec', mesec)
     .eq('leto', leto)
     .maybeSingle();
   if (napakaObstojece) throw new Error(napakaObstojece.message);
 
-  const { data: vsiOdcitki, error: napakaVsi } = await supabase
-    .from('odcitki')
-    .select('mesec, leto, stanje_elektrike, stanje_vode')
-    .eq('soba_id', sobaId)
-    .order('leto', { ascending: false })
-    .order('mesec', { ascending: false })
-    .limit(120);
-  if (napakaVsi) throw new Error(napakaVsi.message);
-
-  const pretekli = (vsiOdcitki ?? []).find(
-    (o) => o.leto < leto || (o.leto === leto && o.mesec < mesec)
-  );
-
-  const prejsnjeStanjeElektrike = pretekli?.stanje_elektrike ?? 0;
-  const prejsnjeStanjeVode = stanjeVode === null ? null : (pretekli?.stanje_vode ?? 0);
+  const pretekli = await pridobiPretekliOdcitekSobe(sobaId, mesec, leto);
 
   let uporabnikId = obstojeceObdobje?.uporabnik_id ?? null;
   if (!uporabnikId) {
@@ -502,6 +763,32 @@ export async function shraniAdminOdcitekSobe(vrednosti, posodobil) {
       .maybeSingle();
     if (napakaNajemnik) throw new Error(napakaNajemnik.message);
     uporabnikId = najemnik?.id ?? null;
+  }
+
+  const uporabnikImaZgodovino = await uporabnikImaPrejsnjiOdcitek(sobaId, uporabnikId, mesec, leto);
+  const zacetnaStanja = !uporabnikImaZgodovino
+    ? await pridobiZacetnaStanjaUporabnika(uporabnikId, sobaId)
+    : null;
+
+  const prejsnjeStanjeElektrike =
+    obstojeceObdobje?.prejsnje_stanje_elektrike ??
+    zacetnaStanja?.zacetno_stanje_elektrike ??
+    pretekli?.stanje_elektrike ??
+    0;
+  const prejsnjeStanjeVode = stanjeVode === null
+    ? null
+    : (
+      obstojeceObdobje?.prejsnje_stanje_vode ??
+      zacetnaStanja?.zacetno_stanje_vode ??
+      pretekli?.stanje_vode ??
+      0
+    );
+
+  if (stanjeElektrike < Number(prejsnjeStanjeElektrike ?? 0)) {
+    throw new Error('Stanje elektrike ne sme biti manjše od začetnega/prejšnjega stanja.');
+  }
+  if (stanjeVode != null && stanjeVode < Number(prejsnjeStanjeVode ?? 0)) {
+    throw new Error('Stanje vode ne sme biti manjše od začetnega/prejšnjega stanja.');
   }
 
   const payload = {
@@ -588,6 +875,15 @@ export async function pripraviPrejsnjeObracunskoObdobje(vrednosti, posodobil) {
   }
 
   if (manjkajociTipi.length > 0) {
+    for (const tip of manjkajociTipi) {
+      const jePotrjenTipMesec = await obstajaPotrjenObracunZaTipInObdobje(tip, mesec, leto);
+      if (jePotrjenTipMesec) {
+        throw new Error(
+          `Za tip hiše "${tip}" v obdobju ${String(mesec).padStart(2, '0')}.${leto} že obstaja potrjen obračun.`
+        );
+      }
+    }
+
     const vrsticeZaVnos = manjkajociTipi.map((tip) => ({
       tip_hise: tip,
       mesec,
@@ -668,11 +964,19 @@ export async function osveziSobeOgrevanjePoObdobju(vrednosti, posodobil) {
 }
 
 export async function pridobiAdminPodatke() {
-  const [uporabnikiRes, sobeRes, ceneRes, ogrevanjeTipiRes, odcitkiRes, placilaRes] = await Promise.all([
-    supabase
+  let uporabnikiRes = await supabase
+    .from('uporabniki')
+    .select('id, ime, priimek, email, telefon, aktiven, admin, soba_id, uporabnik_od, uporabnik_do, zacetno_stanje_elektrike, zacetno_stanje_vode, pogodba_od, pogodba_do, ustvarjeno_ob, posodobljeno_ob, posodobil, sobe(ime_sobe)')
+    .order('uporabnik_od', { ascending: false });
+
+  if (uporabnikiRes.error && jeNapakaManjkajocihKolonZacetnihStanj(uporabnikiRes.error)) {
+    uporabnikiRes = await supabase
       .from('uporabniki')
-      .select('id, ime, priimek, email, telefon, aktiven, admin, soba_id, uporabnik_od, uporabnik_do, ustvarjeno_ob, posodobljeno_ob, posodobil, sobe(ime_sobe)')
-      .order('uporabnik_od', { ascending: false }),
+      .select('id, ime, priimek, email, telefon, aktiven, admin, soba_id, uporabnik_od, uporabnik_do, pogodba_od, pogodba_do, ustvarjeno_ob, posodobljeno_ob, posodobil, sobe(ime_sobe)')
+      .order('uporabnik_od', { ascending: false });
+  }
+
+  const [sobeRes, ceneRes, ogrevanjeTipiRes, odcitkiRes, placilaRes] = await Promise.all([
     supabase
       .from('sobe')
       .select('*')
@@ -732,6 +1036,46 @@ export async function shraniAdminObracun(vrednosti, posodobil) {
     throw new Error('Stanje vode mora biti 0 ali več.');
   }
 
+  const { data: odcitekObstojeci, error: odcitekObstojeciNapaka } = await supabase
+    .from('odcitki')
+    .select('*')
+    .eq('id', odcitekId)
+    .single();
+
+  if (odcitekObstojeciNapaka) throw new Error(odcitekObstojeciNapaka.message);
+
+  await preveriOdklenjenoObdobjeSobe(
+    odcitekObstojeci.soba_id,
+    Number(odcitekObstojeci.mesec),
+    Number(odcitekObstojeci.leto)
+  );
+
+  let obstojeciPlacilo = null;
+  if (vrednosti.placilo_id) {
+    const { data, error } = await supabase
+      .from('placila')
+      .select('id, placano')
+      .eq('id', vrednosti.placilo_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    obstojeciPlacilo = data ?? null;
+  } else if (odcitekObstojeci.uporabnik_id) {
+    const { data, error } = await supabase
+      .from('placila')
+      .select('id, placano')
+      .eq('soba_id', odcitekObstojeci.soba_id)
+      .eq('uporabnik_id', odcitekObstojeci.uporabnik_id)
+      .eq('mesec', odcitekObstojeci.mesec)
+      .eq('leto', odcitekObstojeci.leto)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    obstojeciPlacilo = data ?? null;
+  }
+
+  if (obstojeciPlacilo?.placano) {
+    throw new Error('Obračun je potrjen in ga ni več mogoče spreminjati.');
+  }
+
   const { data: odcitek, error: odcitekNapaka } = await supabase
     .from('odcitki')
     .update({
@@ -756,6 +1100,8 @@ export async function shraniAdminObracun(vrednosti, posodobil) {
     uporabnik_id: odcitek.uporabnik_id,
     mesec: odcitek.mesec,
     leto: odcitek.leto,
+    cena_elektrike: Number(vrednosti.cena_elektrike ?? 0),
+    cena_vode: Number(vrednosti.cena_vode ?? 0),
     najemnina: Number(stroski.najemnina ?? 0),
     strosek_skupni: Number(stroski.strosek_skupni ?? 0),
     strosek_elektrike: Number(stroski.strosek_elektrike ?? 0),
@@ -772,24 +1118,48 @@ export async function shraniAdminObracun(vrednosti, posodobil) {
   let placilo = null;
 
   if (vrednosti.placilo_id) {
-    const { data, error } = await supabase
+    const prviPoskus = await supabase
       .from('placila')
       .update(payloadPlacilo)
       .eq('id', vrednosti.placilo_id)
       .select()
       .single();
 
-    if (error) throw new Error(error.message);
-    placilo = data;
+    if (!prviPoskus.error) {
+      placilo = prviPoskus.data;
+    } else if (jeNapakaManjkajoceSnapshotKolone(prviPoskus.error)) {
+      const { cena_elektrike, cena_vode, ...legacyPayload } = payloadPlacilo;
+      const drugiPoskus = await supabase
+        .from('placila')
+        .update(legacyPayload)
+        .eq('id', vrednosti.placilo_id)
+        .select()
+        .single();
+      if (drugiPoskus.error) throw new Error(drugiPoskus.error.message);
+      placilo = drugiPoskus.data;
+    } else {
+      throw new Error(prviPoskus.error.message);
+    }
   } else if (odcitek.uporabnik_id) {
-    const { data, error } = await supabase
+    const prviPoskus = await supabase
       .from('placila')
       .upsert(payloadPlacilo, { onConflict: 'soba_id,uporabnik_id,mesec,leto' })
       .select()
       .single();
-
-    if (error) throw new Error(error.message);
-    placilo = data;
+    if (!prviPoskus.error) {
+      placilo = prviPoskus.data;
+    } else if (jeNapakaManjkajoceSnapshotKolone(prviPoskus.error)) {
+      const { cena_elektrike, cena_vode, ...legacyPayload } = payloadPlacilo;
+      const drugiPoskus = await supabase
+        .from('placila')
+        .upsert(legacyPayload, { onConflict: 'soba_id,uporabnik_id,mesec,leto' })
+        .select()
+        .single();
+      if (drugiPoskus.error) throw new Error(drugiPoskus.error.message);
+      placilo = drugiPoskus.data;
+    } else {
+      throw new Error(prviPoskus.error.message);
+    }
   }
 
   return { odcitek, placilo };
@@ -987,6 +1357,17 @@ export async function dodajCeno(vrednosti, posodobil) {
   return data;
 }
 
+export async function izbrisiCeno(cenaId) {
+  if (!cenaId) throw new Error('Cena ni določena.');
+
+  const { error } = await supabase
+    .from('cene')
+    .delete()
+    .eq('id', cenaId);
+
+  if (error) throw new Error(error.message);
+}
+
 export async function shraniOgrevanjeTip(vrednosti, posodobil) {
   const payload = {
     ...vrednosti,
@@ -995,6 +1376,17 @@ export async function shraniOgrevanjeTip(vrednosti, posodobil) {
     znesek: Number(vrednosti.znesek),
     posodobil: posodobil ?? null
   };
+
+  const jePotrjenTipMesec = await obstajaPotrjenObracunZaTipInObdobje(
+    payload.tip_hise,
+    payload.mesec,
+    payload.leto
+  );
+  if (jePotrjenTipMesec) {
+    throw new Error(
+      'Za izbran tip hiše in obdobje že obstaja potrjen obračun. Ogrevanja za potrjeno obdobje ni več mogoče spreminjati.'
+    );
+  }
 
   if (vrednosti.id) {
     const { id, ...ostalo } = payload;

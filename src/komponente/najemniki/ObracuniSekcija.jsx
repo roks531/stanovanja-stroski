@@ -83,7 +83,7 @@ export default function ObracuniSekcija({
         <>
           <Grid container spacing={1.5}>
             {racuniZaPrikaz.map((racun) => (
-              <Grid item xs={12} sm={6} md={4} key={racun.id}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={racun.id}>
                 <Box
                   onClick={() => {
                     setIzbranRacunId(racun.id);

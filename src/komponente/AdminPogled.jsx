@@ -52,6 +52,7 @@ import { normalizirajFaktorOgrevanja, razdeliOgrevanjePoSobah } from '../storitv
 import {
   shraniUporabnikaZAuth,
   dodajCeno,
+  izbrisiCeno as izbrisiCenoStoritev,
   shraniSobo as shraniSoboStoritev,
   pridobiAdminPodatke,
   shraniOgrevanjeTip,
@@ -152,7 +153,11 @@ export default function AdminPogled() {
     admin: false,
     aktiven: true,
     uporabnik_od: dayjs().format('YYYY-MM-DD'),
-    uporabnik_do: null
+    uporabnik_do: null,
+    zacetno_stanje_elektrike: '',
+    zacetno_stanje_vode: '',
+    pogodba_od: null,
+    pogodba_do: null
   });
 
   const [novaSoba, setNovaSoba] = useState({
@@ -222,6 +227,16 @@ export default function AdminPogled() {
         : dayjs().format('YYYY-MM-DD'),
       uporabnik_do: uporabnik.uporabnik_do
         ? dayjs(uporabnik.uporabnik_do).format('YYYY-MM-DD')
+        : null,
+      zacetno_stanje_elektrike:
+        uporabnik.zacetno_stanje_elektrike == null ? '' : String(uporabnik.zacetno_stanje_elektrike),
+      zacetno_stanje_vode:
+        uporabnik.zacetno_stanje_vode == null ? '' : String(uporabnik.zacetno_stanje_vode),
+      pogodba_od: uporabnik.pogodba_od
+        ? dayjs(uporabnik.pogodba_od).format('YYYY-MM-DD')
+        : null,
+      pogodba_do: uporabnik.pogodba_do
+        ? dayjs(uporabnik.pogodba_do).format('YYYY-MM-DD')
         : null
     });
   }
@@ -233,10 +248,13 @@ export default function AdminPogled() {
     setNovaCena({
       id: cena.id,
       tip_hise: cena.tip_hise,
-      velja_od: dayjs(cena.velja_od).format('YYYY-MM-DD'),
+      velja_od: cena.velja_od ? dayjs(cena.velja_od).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
       cena_elektrike: cena.cena_elektrike ?? 0,
       cena_vode: cena.cena_vode ?? 0
     });
+    setObvestilo(
+      'Urejanje cene je dovoljeno, dokler cena še ni uporabljena v potrjenem obračunu. V nasprotnem primeru dodaj nov zapis.'
+    );
   }
 
   function izberiOgrevanjeZaUrejanje(ogrevanjeId, seznam = podatki.ogrevanjeTipi) {
@@ -283,7 +301,11 @@ export default function AdminPogled() {
       admin: false,
       aktiven: true,
       uporabnik_od: dayjs().format('YYYY-MM-DD'),
-      uporabnik_do: null
+      uporabnik_do: null,
+      zacetno_stanje_elektrike: '',
+      zacetno_stanje_vode: '',
+      pogodba_od: null,
+      pogodba_do: null
     });
   }
 
@@ -457,6 +479,12 @@ export default function AdminPogled() {
       soba: u.sobe?.ime_sobe ?? '-',
       admin: Boolean(u.admin),
       aktiven: Boolean(u.aktiven),
+      zacetno_stanje_elektrike:
+        u.zacetno_stanje_elektrike == null ? null : Number(u.zacetno_stanje_elektrike),
+      zacetno_stanje_vode:
+        u.zacetno_stanje_vode == null ? null : Number(u.zacetno_stanje_vode),
+      pogodba_od: u.pogodba_od ?? null,
+      pogodba_do: u.pogodba_do ?? null,
       ustvarjeno_ob: u.ustvarjeno_ob ?? null,
       posodobljeno_ob: u.posodobljeno_ob ?? null,
       posodobil_ime: u.posodobil ? (poId.get(u.posodobil) ?? null) : null,
@@ -518,24 +546,74 @@ export default function AdminPogled() {
     [podatki]
   );
 
-  const vrsticeCene = useMemo(
-    () =>
-      podatki.cene.map((c) => ({
+  // Označi cene, ki so že "zaklenjene" z uporabo v potrjenih obračunih.
+  const vrsticeCene = useMemo(() => {
+    const cene = podatki.cene ?? [];
+    const placila = (podatki.placila ?? []).filter((placilo) => Boolean(placilo?.placano));
+    const sobePoId = new Map((podatki.sobe ?? []).map((s) => [s.id, s]));
+
+    const placilaDatumiPoTipu = new Map();
+    placila.forEach((placilo) => {
+      const tip = sobePoId.get(placilo.soba_id)?.tip_hise;
+      if (!tip) return;
+      const datumObdobja = dayjs(`${placilo.leto}-${String(placilo.mesec).padStart(2, '0')}-01`);
+      if (!datumObdobja.isValid()) return;
+      if (!placilaDatumiPoTipu.has(tip)) placilaDatumiPoTipu.set(tip, []);
+      placilaDatumiPoTipu.get(tip).push(datumObdobja.startOf('day'));
+    });
+
+    const cenePoTipu = new Map();
+    cene.forEach((cena) => {
+      if (!cena?.tip_hise) return;
+      if (!cenePoTipu.has(cena.tip_hise)) cenePoTipu.set(cena.tip_hise, []);
+      cenePoTipu.get(cena.tip_hise).push(cena);
+    });
+
+    const povezanaCenaPoId = new Map();
+
+    cenePoTipu.forEach((seznamCenTipa, tip) => {
+      const sortirane = [...seznamCenTipa].sort(
+        (a, b) => dayjs(a.velja_od).valueOf() - dayjs(b.velja_od).valueOf()
+      );
+      const datumiPlacil = placilaDatumiPoTipu.get(tip) ?? [];
+
+      sortirane.forEach((cena, index) => {
+        const od = dayjs(cena.velja_od).startOf('day');
+        const naslednjaCena = index < sortirane.length - 1
+          ? dayjs(sortirane[index + 1].velja_od).startOf('day')
+          : null;
+
+        const jePovezana = datumiPlacil.some((datumPlacila) => {
+          if (!od.isValid()) return false;
+          if (datumPlacila.isBefore(od, 'day')) return false;
+          if (naslednjaCena?.isValid() && !datumPlacila.isBefore(naslednjaCena, 'day')) return false;
+          return true;
+        });
+
+        povezanaCenaPoId.set(cena.id, jePovezana);
+      });
+    });
+
+    return cene.map((c) => {
+      const jePovezanaZObracuni = Boolean(povezanaCenaPoId.get(c.id));
+      return {
         id: c.id,
         tip_hise: c.tip_hise,
         velja_od: dayjs(c.velja_od).format('DD.MM.YYYY'),
         cena_elektrike: Number(c.cena_elektrike).toFixed(4),
-        cena_vode: Number(c.cena_vode).toFixed(4)
-      })),
-    [podatki]
-  );
+        cena_vode: Number(c.cena_vode).toFixed(4),
+        je_povezana_z_obracuni: jePovezanaZObracuni,
+        se_lahko_brise: !jePovezanaZObracuni
+      };
+    });
+  }, [podatki]);
 
   const vrsticeOgrevanjeTipi = useMemo(
     () =>
       podatki.ogrevanjeTipi.map((o) => ({
         id: o.id,
         tip_hise: o.tip_hise,
-        obdobje: `${imenaMesecov[(Number(o.mesec) || 1) - 1]} ${o.leto}`,
+        obdobje: `${String(Number(o.mesec) || 1).padStart(2, '0')}.${o.leto}`,
         znesek: Number(o.znesek ?? 0),
         opomba: o.opomba ?? '',
         mesec: Number(o.mesec),
@@ -603,8 +681,8 @@ export default function AdminPogled() {
           : vodaStanje && trenutnoStanjeVode != null
             ? Math.max(0, trenutnoStanjeVode - prejsnjeStanjeVode)
           : 0;
-      const cenaElektrike = Number(cena?.cena_elektrike ?? 0);
-      const cenaVode = Number(cena?.cena_vode ?? 0);
+      const cenaElektrike = Number(placilo.cena_elektrike ?? cena?.cena_elektrike ?? 0);
+      const cenaVode = Number(placilo.cena_vode ?? cena?.cena_vode ?? 0);
       const strosekElektrike = Number(placilo.strosek_elektrike ?? 0);
       const strosekVode = Number(placilo.strosek_vode ?? 0);
       const najemnina = Number(placilo.najemnina ?? 0);
@@ -667,8 +745,23 @@ export default function AdminPogled() {
   const vrsticeStevciAdmin = useMemo(() => {
     const sobePoId = new Map((podatki.sobe ?? []).map((s) => [s.id, s]));
     const uporabnikiPoId = new Map((podatki.uporabniki ?? []).map((u) => [u.id, u]));
+    const odcitkiPoSoba = new Map();
 
-    return (podatki.odcitki ?? []).map((o) => {
+    (podatki.odcitki ?? []).forEach((o) => {
+      const kljuc = String(o.soba_id ?? '');
+      if (!odcitkiPoSoba.has(kljuc)) odcitkiPoSoba.set(kljuc, []);
+      odcitkiPoSoba.get(kljuc).push(o);
+    });
+
+    odcitkiPoSoba.forEach((seznam) => {
+      seznam.sort((a, b) => {
+        if (Number(a.leto) !== Number(b.leto)) return Number(b.leto) - Number(a.leto);
+        if (Number(a.mesec) !== Number(b.mesec)) return Number(b.mesec) - Number(a.mesec);
+        return dayjs(b.datum_vnosa ?? 0).valueOf() - dayjs(a.datum_vnosa ?? 0).valueOf();
+      });
+    });
+
+    const vrsticeOdcitkov = (podatki.odcitki ?? []).map((o) => {
       const soba = sobePoId.get(o.soba_id);
       const vneselUporabnik = o.posodobil ? uporabnikiPoId.get(o.posodobil) : null;
       const vnesel =
@@ -692,6 +785,57 @@ export default function AdminPogled() {
         vnesel
       };
     });
+
+    const obstojeceObdobjeSobe = new Set(
+      (podatki.odcitki ?? []).map((o) => `${o.soba_id ?? ''}|${Number(o.mesec ?? 0)}|${Number(o.leto ?? 0)}`)
+    );
+
+    // Za najemnike z začetnimi stanji ustvarimo virtualne vrstice, če za začetek še ni odčitka.
+    const vrsticeZacetnihStanj = (podatki.uporabniki ?? [])
+      .filter((u) => u?.soba_id && u?.uporabnik_od)
+      .filter((u) => u?.zacetno_stanje_elektrike != null || u?.zacetno_stanje_vode != null)
+      .map((u) => {
+        const soba = sobePoId.get(u.soba_id);
+        if (!soba) return null;
+
+        const datumZacetka = dayjs(u.uporabnik_od);
+        if (!datumZacetka.isValid()) return null;
+        const mesec = datumZacetka.month() + 1;
+        const leto = datumZacetka.year();
+        const kljucObdobjaSobe = `${u.soba_id}|${mesec}|${leto}`;
+        if (obstojeceObdobjeSobe.has(kljucObdobjaSobe)) return null;
+
+        const pretekli = (odcitkiPoSoba.get(String(u.soba_id)) ?? []).find((o) =>
+          Number(o.leto) < leto || (Number(o.leto) === leto && Number(o.mesec) < mesec)
+        );
+        const imaVodo = sobaImaVodniStevec(soba);
+        const zacetnaElektrika = Number(u.zacetno_stanje_elektrike ?? pretekli?.stanje_elektrike ?? 0);
+        const zacetnaVoda = imaVodo
+          ? Number(u.zacetno_stanje_vode ?? pretekli?.stanje_vode ?? 0)
+          : null;
+
+        return {
+          id: `zacetno-${u.id}`,
+          soba_id: u.soba_id,
+          soba: soba?.ime_sobe ?? '-',
+          tip_hise: soba?.tip_hise ?? '-',
+          voda_stanje: imaVodo,
+          mesec,
+          leto,
+          obdobje: `${String(mesec).padStart(2, '0')}.${leto}`,
+          stanje_elektrike_prej: pretekli?.stanje_elektrike == null ? zacetnaElektrika : Number(pretekli.stanje_elektrike),
+          stanje_elektrike: zacetnaElektrika,
+          stanje_vode_prej: !imaVodo
+            ? null
+            : (pretekli?.stanje_vode == null ? zacetnaVoda : Number(pretekli.stanje_vode)),
+          stanje_vode: zacetnaVoda,
+          datum_vnosa: datumZacetka.format('DD.MM.YYYY'),
+          vnesel: 'Začetno stanje najemnika'
+        };
+      })
+      .filter(Boolean);
+
+    return [...vrsticeZacetnihStanj, ...vrsticeOdcitkov];
   }, [podatki.odcitki, podatki.sobe, podatki.uporabniki]);
 
   const vrsticeStevciAdminFiltrirane = useMemo(
@@ -707,6 +851,79 @@ export default function AdminPogled() {
     () => (podatki.sobe ?? []).find((s) => s.id === novStevecAdmin.soba_id) ?? null,
     [podatki.sobe, novStevecAdmin.soba_id]
   );
+
+  const izbranaSobaNovUporabnik = useMemo(
+    () => (podatki.sobe ?? []).find((s) => s.id === novUporabnik.soba_id) ?? null,
+    [podatki.sobe, novUporabnik.soba_id]
+  );
+
+  // Predlog začetnih stanj vzamemo iz zadnjega znanega odčitka posamezne sobe.
+  const predlogiZacetnihStanjPoSobi = useMemo(() => {
+    const kandidati = [...(podatki.odcitki ?? [])].sort((a, b) => {
+      if (Number(a.leto) !== Number(b.leto)) return Number(b.leto) - Number(a.leto);
+      if (Number(a.mesec) !== Number(b.mesec)) return Number(b.mesec) - Number(a.mesec);
+      return dayjs(b.datum_vnosa ?? 0).valueOf() - dayjs(a.datum_vnosa ?? 0).valueOf();
+    });
+
+    const poSobi = new Map();
+    kandidati.forEach((o) => {
+      if (!o?.soba_id || poSobi.has(o.soba_id)) return;
+      poSobi.set(o.soba_id, {
+        stanje_elektrike: o.stanje_elektrike == null ? null : Number(o.stanje_elektrike),
+        stanje_vode: o.stanje_vode == null ? null : Number(o.stanje_vode)
+      });
+    });
+    return poSobi;
+  }, [podatki.odcitki]);
+
+  const predlogZacetnihStanjZaNovUporabnik = useMemo(
+    () => predlogiZacetnihStanjPoSobi.get(novUporabnik.soba_id) ?? null,
+    [predlogiZacetnihStanjPoSobi, novUporabnik.soba_id]
+  );
+
+  // Pri novem uporabniku samodejno predlagamo začetna stanja, če polji še nista izpolnjeni.
+  useEffect(() => {
+    if (novUporabnik.id || !novUporabnik.soba_id) return;
+    const predlog = predlogiZacetnihStanjPoSobi.get(novUporabnik.soba_id);
+    if (!predlog) return;
+
+    setNovUporabnik((prej) => {
+      if (prej.id || prej.soba_id !== novUporabnik.soba_id) return prej;
+      const naslednjiElektrikaPrazna =
+        prej.zacetno_stanje_elektrike == null || String(prej.zacetno_stanje_elektrike).trim() === '';
+      const naslednjiVodaPrazna =
+        prej.zacetno_stanje_vode == null || String(prej.zacetno_stanje_vode).trim() === '';
+
+      if (!naslednjiElektrikaPrazna && (!naslednjiVodaPrazna || predlog.stanje_vode == null)) {
+        return prej;
+      }
+
+      return {
+        ...prej,
+        zacetno_stanje_elektrike: naslednjiElektrikaPrazna && predlog.stanje_elektrike != null
+          ? String(predlog.stanje_elektrike)
+          : prej.zacetno_stanje_elektrike,
+        zacetno_stanje_vode: naslednjiVodaPrazna && predlog.stanje_vode != null
+          ? String(predlog.stanje_vode)
+          : prej.zacetno_stanje_vode
+      };
+    });
+  }, [novUporabnik.id, novUporabnik.soba_id, predlogiZacetnihStanjPoSobi]);
+
+  function uporabiPredlaganaZacetnaStanja() {
+    if (!predlogZacetnihStanjZaNovUporabnik) return;
+    setNovUporabnik((prej) => ({
+      ...prej,
+      zacetno_stanje_elektrike:
+        predlogZacetnihStanjZaNovUporabnik.stanje_elektrike == null
+          ? ''
+          : String(predlogZacetnihStanjZaNovUporabnik.stanje_elektrike),
+      zacetno_stanje_vode:
+        predlogZacetnihStanjZaNovUporabnik.stanje_vode == null
+          ? ''
+          : String(predlogZacetnihStanjZaNovUporabnik.stanje_vode)
+    }));
+  }
 
   const moznostiFilterSobe = useMemo(
     () =>
@@ -756,8 +973,32 @@ export default function AdminPogled() {
     e.preventDefault();
     setNapaka('');
     try {
+      if (novUporabnik.pogodba_od && novUporabnik.pogodba_do) {
+        const pogodbaOd = dayjs(novUporabnik.pogodba_od);
+        const pogodbaDo = dayjs(novUporabnik.pogodba_do);
+        if (pogodbaOd.isValid() && pogodbaDo.isValid() && pogodbaOd.isAfter(pogodbaDo, 'day')) {
+          throw new Error('Datum "Pogodba od" ne more biti po datumu "Pogodba do".');
+        }
+      }
+
       if (!novUporabnik.id && !novUporabnik.geslo) {
         throw new Error('Za novega uporabnika je obvezno geslo.');
+      }
+
+      if (
+        novUporabnik.zacetno_stanje_elektrike !== '' &&
+        (!Number.isFinite(Number(novUporabnik.zacetno_stanje_elektrike)) ||
+          Number(novUporabnik.zacetno_stanje_elektrike) < 0)
+      ) {
+        throw new Error('Začetno stanje elektrike mora biti 0 ali več.');
+      }
+
+      if (
+        novUporabnik.zacetno_stanje_vode !== '' &&
+        (!Number.isFinite(Number(novUporabnik.zacetno_stanje_vode)) ||
+          Number(novUporabnik.zacetno_stanje_vode) < 0)
+      ) {
+        throw new Error('Začetno stanje vode mora biti 0 ali več.');
       }
 
       await shraniUporabnikaZAuth(
@@ -772,7 +1013,17 @@ export default function AdminPogled() {
           admin: novUporabnik.admin,
           aktiven: novUporabnik.aktiven,
           uporabnik_od: novUporabnik.uporabnik_od,
-          uporabnik_do: novUporabnik.uporabnik_do || null
+          uporabnik_do: novUporabnik.uporabnik_do || null,
+          zacetno_stanje_elektrike:
+            novUporabnik.zacetno_stanje_elektrike === ''
+              ? null
+              : Number(novUporabnik.zacetno_stanje_elektrike),
+          zacetno_stanje_vode:
+            novUporabnik.zacetno_stanje_vode === ''
+              ? null
+              : Number(novUporabnik.zacetno_stanje_vode),
+          pogodba_od: novUporabnik.pogodba_od || null,
+          pogodba_do: novUporabnik.pogodba_do || null
         },
         seja.user.id
       );
@@ -900,6 +1151,15 @@ export default function AdminPogled() {
     e.preventDefault();
     setNapaka('');
     try {
+      if (novaCena.id) {
+        const izbranaCena = vrsticeCene.find((c) => c.id === novaCena.id);
+        if (izbranaCena?.je_povezana_z_obracuni) {
+          throw new Error(
+            'Obračuni so povezani s to ceno, zato je ni več mogoče urejati ali brisati. Dodaj nov zapis z datumom "Velja od".'
+          );
+        }
+      }
+
       await dodajCeno({
         id: novaCena.id || undefined,
         tip_hise: novaCena.tip_hise,
@@ -910,7 +1170,56 @@ export default function AdminPogled() {
       await nalozi();
       ponastaviCenaForm();
     } catch (err) {
-      setNapaka(err.message || 'Cene ni bilo mogoce dodati.');
+      const sporocilo = String(err?.message ?? '');
+      if (
+        sporocilo.includes('Cene, uporabljene v potrjenih obračunih') ||
+        sporocilo.includes('Obračuni so povezani s to ceno')
+      ) {
+        setNapaka(
+          'Obračuni so povezani s to ceno, zato je ni več mogoče urejati ali brisati. Dodaj nov zapis z datumom "Velja od".'
+        );
+        return;
+      }
+      setNapaka(sporocilo || 'Cene ni bilo mogoče shraniti.');
+    }
+  }
+
+  async function izbrisiCenoVrstico(vrstica) {
+    setNapaka('');
+    setObvestilo('');
+
+    if (!vrstica?.id) return;
+    if (vrstica.je_povezana_z_obracuni) {
+      setNapaka(
+        'Obračuni so povezani s to ceno, zato je ni več mogoče urejati ali brisati. Dodaj nov zapis z datumom "Velja od".'
+      );
+      return;
+    }
+
+    const potrjeno = window.confirm(
+      `Izbrišem ceno (${vrstica.tip_hise}, velja od ${vrstica.velja_od})?`
+    );
+    if (!potrjeno) return;
+
+    try {
+      await izbrisiCenoStoritev(vrstica.id);
+      await nalozi();
+      if (novaCena.id === vrstica.id) {
+        ponastaviCenaForm();
+      }
+      setObvestilo('Cena je uspešno izbrisana.');
+    } catch (err) {
+      const sporocilo = String(err?.message ?? '');
+      if (
+        sporocilo.includes('Cene, uporabljene v potrjenih obračunih') ||
+        sporocilo.includes('Obračuni so povezani s to ceno')
+      ) {
+        setNapaka(
+          'Obračuni so povezani s to ceno, zato je ni več mogoče urejati ali brisati. Dodaj nov zapis z datumom "Velja od".'
+        );
+        return;
+      }
+      setNapaka(sporocilo || 'Cene ni bilo mogoče izbrisati.');
     }
   }
 
@@ -1085,6 +1394,9 @@ export default function AdminPogled() {
     if (!params?.row?.odcitek_id) {
       return false;
     }
+    if (params?.row?.placano) {
+      return false;
+    }
     if (params.field === 'stanje_vode') {
       return Boolean(params?.row?.voda_stanje);
     }
@@ -1103,6 +1415,9 @@ export default function AdminPogled() {
 
   async function obdelajPosodobitevObracuna(novaVrstica, staraVrstica) {
     setNapaka('');
+    if (staraVrstica?.placano) {
+      throw new Error('Obračun je potrjen. Za to obdobje odčitkov in stroškov ni več dovoljeno spreminjati.');
+    }
     if (!novaVrstica.odcitek_id) {
       throw new Error('Za ta obračun manjka zapis odčitka. Najprej vnesi števec.');
     }
@@ -1244,7 +1559,9 @@ export default function AdminPogled() {
           strosek_neta: strosekNeta,
           strosek_tv: strosekTv,
           skupni_strosek: skupniStrosek
-        }
+        },
+        cena_elektrike: Number(novaVrstica.cena_elektrike ?? 0),
+        cena_vode: Number(novaVrstica.cena_vode ?? 0)
       },
       seja.user.id
     );
@@ -1331,7 +1648,9 @@ export default function AdminPogled() {
       admin: daNe(Boolean(u.admin)),
       aktiven: daNe(Boolean(u.aktiven)),
       uporabnik_od: u.uporabnik_od ? dayjs(u.uporabnik_od).format('DD.MM.YYYY') : '',
-      uporabnik_do: u.uporabnik_do ? dayjs(u.uporabnik_do).format('DD.MM.YYYY') : ''
+      uporabnik_do: u.uporabnik_do ? dayjs(u.uporabnik_do).format('DD.MM.YYYY') : '',
+      pogodba_od: u.pogodba_od ? dayjs(u.pogodba_od).format('DD.MM.YYYY') : '',
+      pogodba_do: u.pogodba_do ? dayjs(u.pogodba_do).format('DD.MM.YYYY') : ''
     }));
 
     izvoziXlsx(
@@ -1346,7 +1665,9 @@ export default function AdminPogled() {
         { key: 'admin', label: 'Admin' },
         { key: 'aktiven', label: 'Aktiven' },
         { key: 'uporabnik_od', label: 'Uporabnik od' },
-        { key: 'uporabnik_do', label: 'Uporabnik do' }
+        { key: 'uporabnik_do', label: 'Uporabnik do' },
+        { key: 'pogodba_od', label: 'Pogodba od' },
+        { key: 'pogodba_do', label: 'Pogodba do' }
       ],
       vrstice
     );
@@ -1653,6 +1974,9 @@ export default function AdminPogled() {
           stolpciUporabniki={stolpciUporabniki}
           izberiUporabnikaZaUrejanje={izberiUporabnikaZaUrejanje}
           nastaviAktivnostUporabnika={nastaviAktivnostUporabnika}
+          predlogZacetnihStanjZaNovUporabnik={predlogZacetnihStanjZaNovUporabnik}
+          uporabiPredlaganaZacetnaStanja={uporabiPredlaganaZacetnaStanja}
+          sobaImaVodniStevecZaNovUporabnik={sobaImaVodniStevec(izbranaSobaNovUporabnik)}
         />
       )}
 
@@ -1694,6 +2018,7 @@ export default function AdminPogled() {
           lokalizacijaMreze={lokalizacijaMreze}
           izberiCenoZaUrejanje={izberiCenoZaUrejanje}
           shraniCeno={shraniCeno}
+          izbrisiCenoVrstico={izbrisiCenoVrstico}
           ponastaviCenaForm={ponastaviCenaForm}
           novaCena={novaCena}
           setNovaCena={setNovaCena}

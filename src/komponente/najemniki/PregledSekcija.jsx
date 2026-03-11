@@ -29,8 +29,6 @@ import StrosekVrstica from './StrosekVrstica';
 export default function PregledSekcija({
   prijavljenNaziv,
   sobaNaziv,
-  hisaNaziv,
-  izbranaCena,
   imaVodniStevec,
   denar,
   trenutniPrikaz,
@@ -55,13 +53,6 @@ export default function PregledSekcija({
         </Typography>
         <Stack direction="row" spacing={1} mt={1} flexWrap="wrap" useFlexGap>
           <Chip size="small" color="primary" icon={<HomeWorkOutlinedIcon sx={{ fontSize: 13 }} />} label={`Soba: ${sobaNaziv}`} />
-          <Chip size="small" color="info" label={`Hiša: ${hisaNaziv}`} />
-          {izbranaCena && (
-            <Chip size="small" color="warning" icon={<BoltOutlinedIcon sx={{ fontSize: 13 }} />} label={`E: ${denar(izbranaCena.cena_elektrike)}/kWh`} />
-          )}
-          {imaVodniStevec && izbranaCena && (
-            <Chip size="small" color="info" icon={<WaterDropOutlinedIcon sx={{ fontSize: 13 }} />} label={`V: ${denar(izbranaCena.cena_vode)}/m³`} />
-          )}
         </Stack>
       </Box>
 
@@ -72,7 +63,7 @@ export default function PregledSekcija({
             Aktualni mesečni stroški
           </Typography>
           <Grid container spacing={1.5}>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <Box
                 sx={{
                   p: 2,
@@ -94,7 +85,7 @@ export default function PregledSekcija({
               </Box>
             </Grid>
 
-            <Grid item xs={6} sm={3} md={2}>
+            <Grid size={{ xs: 6, sm: 3, md: 2 }}>
               <Box className="stat-kartica">
                 <Stack direction="row" alignItems="center" spacing={0.5} mb={0.5}>
                   <HomeWorkOutlinedIcon sx={{ fontSize: 14, color: '#059669' }} />
@@ -106,7 +97,7 @@ export default function PregledSekcija({
               </Box>
             </Grid>
 
-            <Grid item xs={6} sm={3} md={2}>
+            <Grid size={{ xs: 6, sm: 3, md: 2 }}>
               <Box className="stat-kartica">
                 <Stack direction="row" alignItems="center" spacing={0.5} mb={0.5}>
                   <BoltOutlinedIcon sx={{ fontSize: 14, color: '#f59e0b' }} />
@@ -118,7 +109,7 @@ export default function PregledSekcija({
               </Box>
             </Grid>
 
-            <Grid item xs={6} sm={3} md={2}>
+            <Grid size={{ xs: 6, sm: 3, md: 2 }}>
               <Box className="stat-kartica">
                 <Stack direction="row" alignItems="center" spacing={0.5} mb={0.5}>
                   <WaterDropOutlinedIcon sx={{ fontSize: 14, color: '#3b82f6' }} />
@@ -130,7 +121,7 @@ export default function PregledSekcija({
               </Box>
             </Grid>
 
-            <Grid item xs={6} sm={3} md={2}>
+            <Grid size={{ xs: 6, sm: 3, md: 2 }}>
               <Box className="stat-kartica">
                 <Stack direction="row" alignItems="center" spacing={0.5} mb={0.5}>
                   <WhatshotOutlinedIcon sx={{ fontSize: 14, color: '#d97706' }} />
@@ -147,7 +138,7 @@ export default function PregledSekcija({
 
       <Grid container spacing={2.5}>
         {/* Levo: vnos števcev */}
-        <Grid item xs={12} md={5}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Card className="kartica-jeklo" sx={{ height: '100%' }}>
             <CardContent>
               <Stack component="form" spacing={2} onSubmit={shraniStevce}>
@@ -179,7 +170,7 @@ export default function PregledSekcija({
                     <Typography variant="subtitle2" fontWeight={700}>Elektrika</Typography>
                   </Stack>
                   <Grid container spacing={1}>
-                    <Grid item xs={6}>
+                    <Grid size={6}>
                       <TextField
                         fullWidth
                         size="small"
@@ -195,7 +186,7 @@ export default function PregledSekcija({
                         }}
                       />
                     </Grid>
-                    <Grid item xs={6}>
+                    <Grid size={6}>
                       <TextField
                         fullWidth
                         size="small"
@@ -229,7 +220,7 @@ export default function PregledSekcija({
                       <Typography variant="subtitle2" fontWeight={700}>Voda</Typography>
                     </Stack>
                     <Grid container spacing={1}>
-                      <Grid item xs={6}>
+                      <Grid size={6}>
                         <TextField
                           fullWidth
                           size="small"
@@ -239,7 +230,7 @@ export default function PregledSekcija({
                           InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="caption" color="text.secondary">m³</Typography></InputAdornment> }}
                         />
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid size={6}>
                         <TextField
                           fullWidth
                           size="small"
@@ -293,7 +284,7 @@ export default function PregledSekcija({
         </Grid>
 
         {/* Desno: razčlenitev */}
-        <Grid item xs={12} md={7}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Card className="kartica-jeklo" sx={{ height: '100%' }}>
             <CardContent>
               <Stack spacing={0.25}>

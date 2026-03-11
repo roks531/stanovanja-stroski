@@ -21,6 +21,13 @@ import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import EuroSymbolOutlinedIcon from '@mui/icons-material/EuroSymbolOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import SearchableSelect from '../SearchableSelect';
+import {
+  ADMIN_DATAGRID_FLEKS_SX,
+  ADMIN_SEKCIJA_CARD_SX,
+  ADMIN_SEKCIJA_CONTENT_SX,
+  ADMIN_SEKCIJA_STACK_SX,
+  ADMIN_TABELA_FLEKS_SX
+} from './adminSekcijaPostavitev';
 
 export default function SobeSekcija({
   vrsticeSobe,
@@ -46,9 +53,9 @@ export default function SobeSekcija({
   izberiSoboZaUrejanje
 }) {
   return (
-    <Card className="kartica-jeklo">
-      <CardContent>
-        <Stack spacing={1.5}>
+    <Card className="kartica-jeklo" sx={ADMIN_SEKCIJA_CARD_SX}>
+      <CardContent sx={ADMIN_SEKCIJA_CONTENT_SX}>
+        <Stack spacing={1.5} sx={ADMIN_SEKCIJA_STACK_SX}>
           {/* Glava sekcije */}
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
@@ -149,7 +156,28 @@ export default function SobeSekcija({
                 <TextField label="Skupni" type="number" value={novaSoba.strosek_skupni} onChange={(e) => spremeniNovoSoboStevilo('strosek_skupni', e.target.value)} InputProps={{ endAdornment: <InputAdornment position="end"><EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} /></InputAdornment> }} size="small" sx={{ flex: '1 1 96px' }} />
                 <TextField label="NetTV" type="number" value={novaSoba.nettv} onChange={(e) => spremeniNovoSoboStevilo('nettv', e.target.value)} InputProps={{ endAdornment: <InputAdornment position="end"><EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} /></InputAdornment> }} size="small" sx={{ flex: '1 1 96px' }} />
                 <TextField label="Fiksni" type="number" value={novaSoba.fiksni} onChange={(e) => spremeniNovoSoboStevilo('fiksni', e.target.value)} InputProps={{ endAdornment: <InputAdornment position="end"><EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} /></InputAdornment> }} size="small" sx={{ flex: '1 1 96px' }} />
-                <TextField label="Faktor ogrevanja" type="number" inputProps={{ min: 0, step: '0.01' }} value={novaSoba.faktor_ogrevanja} onChange={(e) => spremeniNovoSoboStevilo('faktor_ogrevanja', e.target.value)} size="small" sx={{ flex: '1 1 104px' }} />
+                <TextField
+                  label="Faktor ogrevanja"
+                  type="number"
+                  inputProps={{ min: 0, step: '0.01' }}
+                  value={novaSoba.faktor_ogrevanja}
+                  onChange={(e) => spremeniNovoSoboStevilo('faktor_ogrevanja', e.target.value)}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Tooltip
+                          title='Strošek ogrevanja za sobo = skupni znesek ogrevanja tipa hiše × (faktor sobe / vsota faktorjev vseh sob iste hiše). Če so vsi faktorji enaki (npr. vsi 1), se ogrevanje razdeli enakomerno.'
+                          arrow
+                          placement="top"
+                        >
+                          <InfoOutlinedIcon sx={{ fontSize: '0.95rem', color: '#0ea5e9', cursor: 'default' }} />
+                        </Tooltip>
+                      </InputAdornment>
+                    )
+                  }}
+                  size="small"
+                  sx={{ flex: '1 1 170px' }}
+                />
                 <TextField
                   label="Voda"
                   type="number"
@@ -192,8 +220,12 @@ export default function SobeSekcija({
           </Box>
 
           {/* Tabela sob */}
-          <Box className="tabela-polna" sx={{ maxWidth: 1150 }}>
+          <Box
+            className="tabela-polna"
+            sx={{ ...ADMIN_TABELA_FLEKS_SX, maxWidth: 1150 }}
+          >
             <DataGrid
+              sx={ADMIN_DATAGRID_FLEKS_SX}
               rows={vrsticeSobe}
               columns={stolpciSobe}
               density="compact"

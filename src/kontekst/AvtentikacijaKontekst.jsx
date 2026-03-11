@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../storitve/supabase';
-import { odjava as odjavaStoritev, pridobiProfil } from '../storitve/avtentikacija';
+import { odjava as odjavaStoritev, pridobiProfil, spremeniGeslo as spremeniGesloStoritev } from '../storitve/avtentikacija';
 
 const AvtentikacijaKontekst = createContext(null);
 
@@ -47,7 +47,7 @@ export function AvtentikacijaProvider({ children }) {
         }
         setSeja(null);
         setProfil(null);
-        void supabase.auth.signOut();
+        void supabase.auth.signOut({ scope: 'local' });
         return;
       }
 
@@ -58,7 +58,7 @@ export function AvtentikacijaProvider({ children }) {
       if (!mountedRef.current || obdelavaId !== obdelavaIdRef.current) return;
       setSeja(null);
       setProfil(null);
-      void supabase.auth.signOut();
+      void supabase.auth.signOut({ scope: 'local' });
     } finally {
       if (!mountedRef.current || obdelavaId !== obdelavaIdRef.current) return;
       if (prikaziNalaganje) {
@@ -119,7 +119,19 @@ export function AvtentikacijaProvider({ children }) {
 
   async function odjava() {
     setPrijavaInfo('');
-    await odjavaStoritev();
+    try {
+      await odjavaStoritev();
+    } catch (err) {
+      console.error('Napaka pri odjavi:', err);
+      // Fallback: ne pusti uporabnika v "zalepljeni" seji, ce odjava odpove.
+      setSeja(null);
+      setProfil(null);
+      setNalaganje(false);
+    }
+  }
+
+  async function spremeniGeslo(novoGeslo) {
+    await spremeniGesloStoritev(novoGeslo);
   }
 
   function pocistiPrijavaInfo() {
@@ -127,7 +139,7 @@ export function AvtentikacijaProvider({ children }) {
   }
 
   const vrednost = useMemo(
-    () => ({ seja, profil, nalaganje, prijavaInfo, osveziProfil, odjava, pocistiPrijavaInfo }),
+    () => ({ seja, profil, nalaganje, prijavaInfo, osveziProfil, odjava, spremeniGeslo, pocistiPrijavaInfo }),
     [seja, profil, nalaganje, prijavaInfo]
   );
 

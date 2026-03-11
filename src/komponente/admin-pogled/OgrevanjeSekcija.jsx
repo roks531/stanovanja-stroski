@@ -17,6 +17,15 @@ import { DataGrid } from '@mui/x-data-grid';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import EuroSymbolOutlinedIcon from '@mui/icons-material/EuroSymbolOutlined';
 import SearchableSelect from '../SearchableSelect';
+import {
+  ADMIN_DATAGRID_FLEKS_SX,
+  ADMIN_GRID_FLEKS_SX,
+  ADMIN_GRID_ITEM_FLEKS_SX,
+  ADMIN_SEKCIJA_CARD_SX,
+  ADMIN_SEKCIJA_CONTENT_SX,
+  ADMIN_SEKCIJA_STACK_SX,
+  ADMIN_TABELA_FLEKS_SX
+} from './adminSekcijaPostavitev';
 
 const KOMPAKTEN_SLOG_POLJ = {
   '& .MuiInputLabel-root': { fontSize: '0.8rem' },
@@ -43,9 +52,9 @@ export default function OgrevanjeSekcija({
   imenaMesecov
 }) {
   return (
-    <Card className="kartica-jeklo">
-      <CardContent>
-        <Stack spacing={1.5}>
+    <Card className="kartica-jeklo" sx={ADMIN_SEKCIJA_CARD_SX}>
+      <CardContent sx={ADMIN_SEKCIJA_CONTENT_SX}>
+        <Stack spacing={1.5} sx={ADMIN_SEKCIJA_STACK_SX}>
           {/* Glava sekcije */}
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
@@ -72,10 +81,11 @@ export default function OgrevanjeSekcija({
             </Button>
           </Stack>
 
-          <Grid container spacing={2} alignItems="stretch">
-            <Grid item xs={12} md={8}>
-              <Box className="tabela-polna">
+          <Grid container spacing={2} alignItems="stretch" sx={ADMIN_GRID_FLEKS_SX}>
+            <Grid size={{ xs: 12, md: 8 }} sx={ADMIN_GRID_ITEM_FLEKS_SX}>
+              <Box className="tabela-polna" sx={ADMIN_TABELA_FLEKS_SX}>
                 <DataGrid
+                  sx={ADMIN_DATAGRID_FLEKS_SX}
                   rows={vrsticeOgrevanjeTipi}
                   columns={stolpciOgrevanjeTipi}
                   density="compact"
@@ -89,17 +99,15 @@ export default function OgrevanjeSekcija({
               </Box>
             </Grid>
 
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Box
                 sx={{
                   border: '1px solid',
                   borderColor: 'divider',
                   borderRadius: 1,
                   p: 2.5,
-                  height: '100%',
                   backgroundColor: 'background.paper',
-                  maxWidth: { xs: '100%', md: 340 },
-                  ml: { xs: 0, md: 'auto' }
+                  maxWidth: 360,
                 }}
               >
                 <Stack component="form" spacing={1} onSubmit={shraniOgrevanjePoTipu} sx={KOMPAKTEN_SLOG_POLJ}>
@@ -115,7 +123,7 @@ export default function OgrevanjeSekcija({
                     />
                     {novoOgrevanje.id && (
                       <Typography variant="caption" color="text.secondary">
-                        {novoOgrevanje.tip_hise} | {imenaMesecov[(Number(novoOgrevanje.mesec) || 1) - 1]} {novoOgrevanje.leto}
+                        {novoOgrevanje.tip_hise} | {String(Number(novoOgrevanje.mesec) || 1).padStart(2, '0')}.{novoOgrevanje.leto}
                       </Typography>
                     )}
                     {!novoOgrevanje.id && (
@@ -139,7 +147,7 @@ export default function OgrevanjeSekcija({
                     disableClearable
                   />
                   <Grid container spacing={1}>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField
                         label="Leto"
                         type="number"
@@ -149,7 +157,7 @@ export default function OgrevanjeSekcija({
                         fullWidth
                       />
                     </Grid>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField
                         label="Ogrevanje"
                         type="number"

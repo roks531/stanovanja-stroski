@@ -2,6 +2,7 @@
  * Sekcija "Uporabniki" v administraciji.
  * Komponenta je namenoma prezentacijska: vsa poslovna logika ostane v `AdminPogled`.
  */
+import { useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -27,8 +28,39 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import GppGoodOutlinedIcon from '@mui/icons-material/GppGoodOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
+import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import dayjs from 'dayjs';
 import SearchableSelect from '../SearchableSelect';
+import {
+  ADMIN_DATAGRID_FLEKS_SX,
+  ADMIN_SEKCIJA_CARD_SX,
+  ADMIN_SEKCIJA_CONTENT_SX,
+  ADMIN_SEKCIJA_STACK_SX,
+  ADMIN_TABELA_FLEKS_SX
+} from './adminSekcijaPostavitev';
+
+const FILTER_CHIP_BASE_SX = {
+  '& .MuiChip-label': { fontWeight: 600 },
+  '&.MuiChip-clickable:active': { opacity: 1 },
+  '&.Mui-focusVisible': { boxShadow: 'none' }
+};
+
+function statusPogodbeFilter(pogodbaOd, pogodbaDo) {
+  if (!pogodbaOd || !pogodbaDo) return 'drugo';
+
+  const danes = dayjs().startOf('day');
+  const od = dayjs(pogodbaOd).startOf('day');
+  const doDatuma = dayjs(pogodbaDo).startOf('day');
+
+  if (!od.isValid() || !doDatuma.isValid()) return 'drugo';
+  if (danes.isAfter(doDatuma, 'day')) return 'potekla';
+  if (danes.isBefore(od, 'day')) return 'prihaja';
+
+  const dniDoPoteka = doDatuma.diff(danes, 'day');
+  if (dniDoPoteka <= 31) return 'kmalu';
+
+  return 'aktivna';
+}
 
 export default function UporabnikiSekcija({
   vrsticeUporabniki,
@@ -49,12 +81,37 @@ export default function UporabnikiSekcija({
   lokalizacijaMreze,
   stolpciUporabniki,
   izberiUporabnikaZaUrejanje,
-  nastaviAktivnostUporabnika
+  nastaviAktivnostUporabnika,
+  predlogZacetnihStanjZaNovUporabnik,
+  uporabiPredlaganaZacetnaStanja,
+  sobaImaVodniStevecZaNovUporabnik
 }) {
+  const [filterPogodbe, setFilterPogodbe] = useState(null);
+
+  const stetjePogodb = useMemo(
+    () =>
+      vrsticeUporabniki.reduce(
+        (acc, vrstica) => {
+          const status = statusPogodbeFilter(vrstica.pogodba_od, vrstica.pogodba_do);
+          if (status in acc) acc[status] += 1;
+          return acc;
+        },
+        { aktivna: 0, kmalu: 0, potekla: 0 }
+      ),
+    [vrsticeUporabniki]
+  );
+
+  const vrsticeUporabnikiFiltrirane = useMemo(() => {
+    if (!filterPogodbe) return vrsticeUporabniki;
+    return vrsticeUporabniki.filter(
+      (vrstica) => statusPogodbeFilter(vrstica.pogodba_od, vrstica.pogodba_do) === filterPogodbe
+    );
+  }, [filterPogodbe, vrsticeUporabniki]);
+
   return (
-    <Card className="kartica-jeklo">
-      <CardContent>
-        <Stack spacing={1.5}>
+    <Card className="kartica-jeklo" sx={ADMIN_SEKCIJA_CARD_SX}>
+      <CardContent sx={ADMIN_SEKCIJA_CONTENT_SX}>
+        <Stack spacing={1.5} sx={ADMIN_SEKCIJA_STACK_SX}>
           {/* Glava sekcije */}
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
@@ -65,7 +122,13 @@ export default function UporabnikiSekcija({
             <Box>
               <Stack direction="row" alignItems="center" gap={1.5} flexWrap="wrap">
                 <Typography variant="h5">Vsi uporabniki</Typography>
-                <Chip size="small" color="primary" label={`${vrsticeUporabniki.length} zapisov`} />
+                <Chip
+                  size="small"
+                  color="primary"
+                  label={filterPogodbe
+                    ? `${vrsticeUporabnikiFiltrirane.length} / ${vrsticeUporabniki.length} zapisov`
+                    : `${vrsticeUporabniki.length} zapisov`}
+                />
               </Stack>
               <Typography variant="body2" color="text.secondary" mt={0.25}>
                 Klikni vrstico v tabeli za urejanje podatkov.
@@ -192,8 +255,64 @@ export default function UporabnikiSekcija({
                     { value: '', label: 'Brez sobe' },
                     ...(podatkiSobe ?? []).map((s) => ({ value: s.id, label: s.ime_sobe }))
                   ]}
-                  sx={{ flex: '2 1 260px' }}
+                  sx={{ flex: '1 1 180px' }}
                 />
+                <TextField
+                  label="Začetno stanje elektrike"
+                  type="number"
+                  value={novUporabnik.zacetno_stanje_elektrike ?? ''}
+                  onChange={(e) =>
+                    setNovUporabnik({ ...novUporabnik, zacetno_stanje_elektrike: e.target.value })
+                  }
+                  size="small"
+                  sx={{ flex: '1 1 170px' }}
+                  inputProps={{ min: 0, step: 1 }}
+                  helperText={predlogZacetnihStanjZaNovUporabnik?.stanje_elektrike != null
+                    ? `Predlog: ${predlogZacetnihStanjZaNovUporabnik.stanje_elektrike}`
+                    : 'Vnesi ob primopredaji'}
+                />
+                <TextField
+                  label="Začetno stanje vode"
+                  type="number"
+                  value={novUporabnik.zacetno_stanje_vode ?? ''}
+                  onChange={(e) =>
+                    setNovUporabnik({ ...novUporabnik, zacetno_stanje_vode: e.target.value })
+                  }
+                  size="small"
+                  sx={{ flex: '1 1 170px' }}
+                  inputProps={{ min: 0, step: 1 }}
+                  disabled={!sobaImaVodniStevecZaNovUporabnik}
+                  helperText={!sobaImaVodniStevecZaNovUporabnik
+                    ? 'Soba nima vodnega števca'
+                    : (predlogZacetnihStanjZaNovUporabnik?.stanje_vode != null
+                      ? `Predlog: ${predlogZacetnihStanjZaNovUporabnik.stanje_vode}`
+                      : 'Vnesi ob primopredaji')}
+                />
+                <Tooltip title="Pridobi zadnje vrednosti števca za to sobo">
+                  <span>
+                    <IconButton
+                      type="button"
+                      size="small"
+                      color="primary"
+                      onClick={uporabiPredlaganaZacetnaStanja}
+                      disabled={!predlogZacetnihStanjZaNovUporabnik}
+                      aria-label="Uporabi zadnji odčitek sobe"
+                      sx={{
+                        alignSelf: 'flex-start',
+                        mt: 0.25,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: '8px',
+                        backgroundColor: 'background.paper',
+                        '&:hover': {
+                          backgroundColor: 'action.hover'
+                        }
+                      }}
+                    >
+                      <RefreshOutlinedIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
                 <DatePicker
                   label="Uporabnik od"
                   value={novUporabnik.uporabnik_od ? dayjs(novUporabnik.uporabnik_od) : null}
@@ -207,7 +326,7 @@ export default function UporabnikiSekcija({
                     textField: {
                       size: 'small',
                       sx: {
-                        flex: '1 1 160px',
+                        flex: '1 1 150px',
                         '& .MuiInputLabel-root': { fontSize: '0.8rem' },
                         '& .MuiInputLabel-root.MuiInputLabel-shrink': { fontSize: '0.74rem' },
                         '& .MuiInputBase-input': { fontSize: '0.82rem' },
@@ -218,6 +337,58 @@ export default function UporabnikiSekcija({
                     }
                   }}
                 />
+                <Box sx={{ display: 'flex', flex: '2 1 360px', gap: 1, minWidth: 320 }}>
+                  <DatePicker
+                    label="Pogodba od"
+                    value={novUporabnik.pogodba_od ? dayjs(novUporabnik.pogodba_od) : null}
+                    onChange={(novaVrednost) =>
+                      setNovUporabnik({
+                        ...novUporabnik,
+                        pogodba_od: novaVrednost ? novaVrednost.format('YYYY-MM-DD') : null
+                      })
+                    }
+                    slotProps={{
+                      textField: {
+                        size: 'small',
+                        sx: {
+                          flex: 1,
+                          minWidth: 0,
+                          '& .MuiInputLabel-root': { fontSize: '0.8rem' },
+                          '& .MuiInputLabel-root.MuiInputLabel-shrink': { fontSize: '0.74rem' },
+                          '& .MuiInputBase-input': { fontSize: '0.82rem' },
+                          '& .MuiPickersSectionList-root': { fontSize: '0.82rem' },
+                          '& .MuiPickersSectionList-section': { fontSize: '0.82rem' },
+                          '& .MuiPickersInputBase-input': { fontSize: '0.82rem' }
+                        }
+                      }
+                    }}
+                  />
+                  <DatePicker
+                    label="Pogodba do"
+                    value={novUporabnik.pogodba_do ? dayjs(novUporabnik.pogodba_do) : null}
+                    onChange={(novaVrednost) =>
+                      setNovUporabnik({
+                        ...novUporabnik,
+                        pogodba_do: novaVrednost ? novaVrednost.format('YYYY-MM-DD') : null
+                      })
+                    }
+                    slotProps={{
+                      textField: {
+                        size: 'small',
+                        sx: {
+                          flex: 1,
+                          minWidth: 0,
+                          '& .MuiInputLabel-root': { fontSize: '0.8rem' },
+                          '& .MuiInputLabel-root.MuiInputLabel-shrink': { fontSize: '0.74rem' },
+                          '& .MuiInputBase-input': { fontSize: '0.82rem' },
+                          '& .MuiPickersSectionList-root': { fontSize: '0.82rem' },
+                          '& .MuiPickersSectionList-section': { fontSize: '0.82rem' },
+                          '& .MuiPickersInputBase-input': { fontSize: '0.82rem' }
+                        }
+                      }
+                    }}
+                  />
+                </Box>
               </Box>
 
               <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ ml: '2px' }}>
@@ -239,9 +410,113 @@ export default function UporabnikiSekcija({
           </Box>
 
           {/* Tabela uporabnikov */}
-          <Box className="tabela-polna" sx={{ maxWidth: 960 }}>
+          <Box
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 1,
+              px: 1.25,
+              py: 0.85,
+              backgroundColor: '#f8fafc',
+              width: '100%',
+              maxWidth: 1320,
+              mx: 'auto'
+            }}
+          >
+            <Stack direction="row" alignItems="center" flexWrap="wrap" gap={0.75}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, mr: 0.5 }}>
+                Filter pogodbe
+              </Typography>
+              <Chip
+                size="small"
+                color="primary"
+                variant="outlined"
+                label={`Vse (${vrsticeUporabniki.length})`}
+                onClick={() => setFilterPogodbe(null)}
+                clickable
+                sx={{
+                  ...FILTER_CHIP_BASE_SX,
+                  ...(filterPogodbe
+                    ? {}
+                    : {
+                      bgcolor: '#dbeafe',
+                      color: '#1e3a8a',
+                      borderColor: '#93c5fd',
+                      '&:hover': { bgcolor: '#bfdbfe' }
+                    })
+                }}
+              />
+              <Chip
+                size="small"
+                color="success"
+                variant="outlined"
+                label={`Aktivna (${stetjePogodb.aktivna})`}
+                onClick={() =>
+                  setFilterPogodbe((prej) => (prej === 'aktivna' ? null : 'aktivna'))
+                }
+                clickable
+                sx={{
+                  ...FILTER_CHIP_BASE_SX,
+                  ...(filterPogodbe === 'aktivna'
+                    ? {
+                      bgcolor: '#dcfce7',
+                      color: '#166534',
+                      borderColor: '#86efac',
+                      '&:hover': { bgcolor: '#bbf7d0' }
+                    }
+                    : {})
+                }}
+              />
+              <Chip
+                size="small"
+                color="warning"
+                variant="outlined"
+                label={`Poteče v 30 dneh (${stetjePogodb.kmalu})`}
+                onClick={() => setFilterPogodbe((prej) => (prej === 'kmalu' ? null : 'kmalu'))}
+                clickable
+                sx={{
+                  ...FILTER_CHIP_BASE_SX,
+                  ...(filterPogodbe === 'kmalu'
+                    ? {
+                      bgcolor: '#fef3c7',
+                      color: '#92400e',
+                      borderColor: '#fcd34d',
+                      '&:hover': { bgcolor: '#fde68a' }
+                    }
+                    : {})
+                }}
+              />
+              <Chip
+                size="small"
+                color="error"
+                variant="outlined"
+                label={`Potekla (${stetjePogodb.potekla})`}
+                onClick={() =>
+                  setFilterPogodbe((prej) => (prej === 'potekla' ? null : 'potekla'))
+                }
+                clickable
+                sx={{
+                  ...FILTER_CHIP_BASE_SX,
+                  ...(filterPogodbe === 'potekla'
+                    ? {
+                      bgcolor: '#fee2e2',
+                      color: '#991b1b',
+                      borderColor: '#fca5a5',
+                      '&:hover': { bgcolor: '#fecaca' }
+                    }
+                    : {})
+                }}
+              />
+            </Stack>
+          </Box>
+
+          <Box
+            className="tabela-polna"
+            sx={{ ...ADMIN_TABELA_FLEKS_SX, maxWidth: 1320, mx: 'auto' }}
+          >
             <DataGrid
-              rows={vrsticeUporabniki}
+              sx={ADMIN_DATAGRID_FLEKS_SX}
+              rows={vrsticeUporabnikiFiltrirane}
               columns={stolpciUporabniki}
               density="compact"
               rowHeight={68}

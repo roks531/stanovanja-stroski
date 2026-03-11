@@ -13,6 +13,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Box, CircularProgress, Stack, Typography } from '@mui/material';
+
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined';
 import dayjs from 'dayjs';
@@ -132,7 +133,6 @@ export default function NajemnikPogled() {
   const prijavljenNaziv =
     [profil?.ime, profil?.priimek].filter(Boolean).join(' ') || profil?.email || 'uporabnik';
   const sobaNaziv = paket?.soba?.ime_sobe || '-';
-  const hisaNaziv = paket?.soba?.tip_hise || '-';
   const imaVodniStevec = sobaImaVodniStevec(paket?.soba);
 
   const predogledStevca = useMemo(() => {
@@ -457,10 +457,11 @@ export default function NajemnikPogled() {
       aktivnaSekcija={sekcija}
       onSpremembaSekcije={setSekcija}
       naslov={prijavljenNaziv}
-      podnaslov={`Soba ${sobaNaziv} · ${hisaNaziv}`}
+      podnaslov={`Soba ${sobaNaziv}`}
       onOdjava={odjava}
       brandPodnaslov="Obračuni"
     >
+      <Box sx={{ maxWidth: 860, width: '100%' }}>
       {/* ── Globalna napaka ── */}
       {napaka && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setNapaka('')}>
@@ -473,8 +474,6 @@ export default function NajemnikPogled() {
         <PregledSekcija
           prijavljenNaziv={prijavljenNaziv}
           sobaNaziv={sobaNaziv}
-          hisaNaziv={hisaNaziv}
-          izbranaCena={izbranaCena}
           imaVodniStevec={imaVodniStevec}
           denar={denar}
           trenutniPrikaz={trenutniPrikaz}
@@ -511,6 +510,7 @@ export default function NajemnikPogled() {
           setPodrobnostiOdprte={setPodrobnostiOdprte}
         />
       )}
+      </Box>
 
       <DialogPodrobnostiObracuna
         podrobnostiOdprte={podrobnostiOdprte}

@@ -15,21 +15,14 @@ import { DataGrid } from '@mui/x-data-grid';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import SearchableSelect from '../SearchableSelect';
+import {
+  ADMIN_DATAGRID_FLEKS_SX,
+  ADMIN_SEKCIJA_CARD_SX,
+  ADMIN_SEKCIJA_CONTENT_SX,
+  ADMIN_SEKCIJA_STACK_SX,
+  ADMIN_TABELA_FLEKS_SX
+} from './adminSekcijaPostavitev';
 
-const KOMPAKTEN_SLOG_FILTRA = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 1,
-  alignItems: 'center',
-  maxWidth: { sm: 900 },
-  '& .MuiInputLabel-root': { fontSize: '0.8rem' },
-  '& .MuiInputLabel-root.MuiInputLabel-shrink': { fontSize: '0.74rem' },
-  '& .MuiInputBase-input': { fontSize: '0.82rem' },
-  '& .MuiFormHelperText-root': { fontSize: '0.72rem' },
-  '& .MuiFormControlLabel-label': { fontSize: '0.82rem' },
-  '& .MuiChip-label': { fontSize: '0.72rem' },
-  '& .MuiButton-root': { fontSize: '0.76rem' }
-};
 
 export default function ObracuniSekcija({
   vrsticeObracuniFiltrirane,
@@ -49,9 +42,9 @@ export default function ObracuniSekcija({
   jeCelicaObracunUredljiva
 }) {
   return (
-    <Card className="kartica-jeklo">
-      <CardContent>
-        <Stack spacing={1.5}>
+    <Card className="kartica-jeklo" sx={ADMIN_SEKCIJA_CARD_SX}>
+      <CardContent sx={ADMIN_SEKCIJA_CONTENT_SX}>
+        <Stack spacing={1.5} sx={ADMIN_SEKCIJA_STACK_SX}>
           {/* Glava sekcije */}
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
@@ -67,7 +60,7 @@ export default function ObracuniSekcija({
                 <Chip size="small" color="warning" label={`Odprto: ${vrsticeObracuniFiltrirane.filter((v) => !v.placano).length}`} />
               </Stack>
               <Typography variant="body2" color="text.secondary" mt={0.25}>
-                Potrjeni obračuni z odčitki in statusom potrditve. Dvakrat klikni polje za urejanje.
+                Potrjeni obračuni so zaklenjeni. Urejati je mogoče samo odprte obračune.
               </Typography>
             </Box>
             <Stack direction="row" gap={1}>
@@ -93,51 +86,59 @@ export default function ObracuniSekcija({
           </Stack>
 
           {/* Filtri obračunov */}
-          <Box sx={KOMPAKTEN_SLOG_FILTRA}>
-            <SearchableSelect
-              label="Soba"
-              value={filterObracuni.soba_id}
-              onChange={(novaVrednost) => setFilterObracuni((prej) => ({ ...prej, soba_id: novaVrednost }))}
-              options={[
-                { value: '', label: 'Vse sobe' },
-                ...moznostiFilterSobe.map((soba) => ({ value: soba.id, label: soba.ime }))
-              ]}
-              sx={{ minWidth: { xs: '100%', sm: 200 }, maxWidth: { sm: 240 } }}
-            />
-            <SearchableSelect
-              label="Najemnik"
-              value={filterObracuni.uporabnik_id}
-              onChange={(novaVrednost) => setFilterObracuni((prej) => ({ ...prej, uporabnik_id: novaVrednost }))}
-              options={[
-                { value: '', label: 'Vsi najemniki' },
-                ...moznostiFilterUporabniki.map((uporabnik) => ({ value: uporabnik.id, label: uporabnik.ime }))
-              ]}
-              sx={{ minWidth: { xs: '100%', sm: 200 }, maxWidth: { sm: 240 } }}
-            />
-            <SearchableSelect
-              label="Mesec"
-              value={filterObracuni.mesec}
-              onChange={(novaVrednost) => setFilterObracuni((prej) => ({ ...prej, mesec: novaVrednost }))}
-              options={[
-                { value: '', label: 'Vsi' },
-                ...imenaMesecov.map((ime, idx) => ({ value: idx + 1, label: ime }))
-              ]}
-              sx={{ minWidth: { xs: 'calc(50% - 4px)', sm: 150 }, maxWidth: { sm: 170 } }}
-            />
-            <SearchableSelect
-              label="Leto"
-              value={filterObracuni.leto}
-              onChange={(novaVrednost) => setFilterObracuni((prej) => ({ ...prej, leto: novaVrednost }))}
-              options={[
-                { value: '', label: 'Vsa' },
-                ...letaObracunov.map((leto) => ({ value: leto, label: String(leto) }))
-              ]}
-              sx={{ minWidth: { xs: 'calc(50% - 4px)', sm: 110 }, maxWidth: { sm: 130 } }}
-            />
+          <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center" sx={{
+            '& .MuiInputLabel-root': { fontSize: '0.8rem' },
+            '& .MuiInputLabel-root.MuiInputLabel-shrink': { fontSize: '0.74rem' },
+            '& .MuiInputBase-input': { fontSize: '0.82rem' },
+          }}>
+            <Box sx={{ width: 190 }}>
+              <SearchableSelect
+                label="Soba"
+                value={filterObracuni.soba_id}
+                onChange={(novaVrednost) => setFilterObracuni((prej) => ({ ...prej, soba_id: novaVrednost }))}
+                options={[
+                  { value: '', label: 'Vse sobe' },
+                  ...moznostiFilterSobe.map((soba) => ({ value: soba.id, label: soba.ime }))
+                ]}
+              />
+            </Box>
+            <Box sx={{ width: 190 }}>
+              <SearchableSelect
+                label="Najemnik"
+                value={filterObracuni.uporabnik_id}
+                onChange={(novaVrednost) => setFilterObracuni((prej) => ({ ...prej, uporabnik_id: novaVrednost }))}
+                options={[
+                  { value: '', label: 'Vsi najemniki' },
+                  ...moznostiFilterUporabniki.map((uporabnik) => ({ value: uporabnik.id, label: uporabnik.ime }))
+                ]}
+              />
+            </Box>
+            <Box sx={{ width: 148 }}>
+              <SearchableSelect
+                label="Mesec"
+                value={filterObracuni.mesec}
+                onChange={(novaVrednost) => setFilterObracuni((prej) => ({ ...prej, mesec: novaVrednost }))}
+                options={[
+                  { value: '', label: 'Vsi' },
+                  ...imenaMesecov.map((ime, idx) => ({ value: idx + 1, label: ime }))
+                ]}
+              />
+            </Box>
+            <Box sx={{ width: 110 }}>
+              <SearchableSelect
+                label="Leto"
+                value={filterObracuni.leto}
+                onChange={(novaVrednost) => setFilterObracuni((prej) => ({ ...prej, leto: novaVrednost }))}
+                options={[
+                  { value: '', label: 'Vsa' },
+                  ...letaObracunov.map((leto) => ({ value: leto, label: String(leto) }))
+                ]}
+              />
+            </Box>
             <Button
               variant="outlined"
               size="small"
-              sx={{ minWidth: { xs: '100%', sm: 130 }, maxWidth: { sm: 160 }, height: 34 }}
+              sx={{ height: 40, whiteSpace: 'nowrap' }}
               onClick={() =>
                 setFilterObracuni({
                   soba_id: '',
@@ -149,11 +150,12 @@ export default function ObracuniSekcija({
             >
               Počisti filtre
             </Button>
-          </Box>
+          </Stack>
 
           {/* Tabela obračunov */}
-          <Box className="tabela-polna">
+          <Box className="tabela-polna" sx={ADMIN_TABELA_FLEKS_SX}>
             <DataGrid
+              sx={ADMIN_DATAGRID_FLEKS_SX}
               rows={vrsticeObracuniFiltrirane}
               columns={stolpciObracuni}
               density="compact"

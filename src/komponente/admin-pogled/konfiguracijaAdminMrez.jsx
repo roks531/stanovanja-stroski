@@ -17,15 +17,53 @@ import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
+
+function formatDatumPogodbe(vrednost) {
+  if (!vrednost) return '—';
+  const d = dayjs(vrednost);
+  return d.isValid() ? d.format('DD.MM.YYYY') : '—';
+}
+
+// Vrne ključ statusa pogodbe za prikaz barv in filtriranje.
+function statusPogodbe(pogodbaOd, pogodbaDo) {
+  if (!pogodbaOd || !pogodbaDo) {
+    return 'manjka';
+  }
+
+  const danes = dayjs().startOf('day');
+  const od = dayjs(pogodbaOd).startOf('day');
+  const doDatuma = dayjs(pogodbaDo).startOf('day');
+
+  if (!od.isValid() || !doDatuma.isValid()) {
+    return 'manjka';
+  }
+
+  if (danes.isAfter(doDatuma, 'day')) {
+    return 'potekla';
+  }
+
+  if (danes.isBefore(od, 'day')) {
+    return 'prihaja';
+  }
+
+  const dniDoPoteka = doDatuma.diff(danes, 'day');
+  if (dniDoPoteka <= 31) {
+    return 'kmalu';
+  }
+
+  return 'aktivna';
+}
+
 const stolpciUporabniki = [
-  { field: 'ime_priimek', headerName: 'Ime in priimek', flex: 1, minWidth: 220,
+  { field: 'ime_priimek', headerName: 'Ime in priimek', flex: 0.9, minWidth: 220, maxWidth: 300,
     renderHeader: () => <Box sx={{ whiteSpace: 'normal', lineHeight: 1.3, fontSize: '0.72rem', fontWeight: 600 }}>Ime in<br />priimek</Box>
   },
   {
     field: 'kontakt',
     headerName: 'Kontakt',
-    flex: 1.2,
+    flex: 1,
     minWidth: 240,
+    maxWidth: 360,
     sortable: false,
     renderCell: (params) => (
       <Stack spacing={0.25} py={0.5}>
@@ -83,6 +121,100 @@ const stolpciUporabniki = [
             <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: '#94a3b8' }}>neaktiven</Typography>
           </Box>
     )
+  },
+  {
+    field: 'pogodba',
+    headerName: 'Pogodba',
+    width: 138,
+    sortable: false,
+    filterable: false,
+    renderCell: (params) => {
+      const od = formatDatumPogodbe(params.row.pogodba_od);
+      const doDatuma = formatDatumPogodbe(params.row.pogodba_do);
+      const status = statusPogodbe(params.row.pogodba_od, params.row.pogodba_do);
+      const statusBarve =
+        status === 'aktivna'
+          ? { rob: '#a7f3d0', pika: '#059669' }
+          : status === 'potekla'
+            ? { rob: '#fecaca', pika: '#dc2626' }
+            : status === 'kmalu' || status === 'prihaja'
+              ? { rob: '#fde68a', pika: '#d97706' }
+              : { rob: '#cbd5e1', pika: '#94a3b8' };
+
+      return (
+        <Stack spacing={0.1} sx={{ py: 0.2, width: '100%' }}>
+          <Stack direction="row" spacing={0.45} alignItems="center">
+            <Box
+              sx={{
+                width: 7,
+                height: 7,
+                flexShrink: 0,
+                visibility: 'hidden'
+              }}
+            />
+            <Typography sx={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.2 }} noWrap>
+              od: {od}
+            </Typography>
+          </Stack>
+          <Stack direction="row" spacing={0.45} alignItems="center">
+            <Box
+              sx={{
+                width: 7,
+                height: 7,
+                borderRadius: '999px',
+                background: statusBarve.pika,
+                border: `1px solid ${statusBarve.rob}`,
+                flexShrink: 0
+              }}
+            />
+            <Typography sx={{ fontSize: '0.68rem', color: '#475569', lineHeight: 1.2 }} noWrap>
+              do: {doDatuma}
+            </Typography>
+          </Stack>
+        </Stack>
+      );
+    }
+  },
+  {
+    field: 'zacetno_stanje',
+    headerName: 'Začetno stanje',
+    width: 118,
+    renderHeader: () => (
+      <Box sx={{ whiteSpace: 'normal', lineHeight: 1.2, fontSize: '0.72rem', fontWeight: 600 }}>
+        Začetno
+        <br />
+        stanje
+      </Box>
+    ),
+    sortable: false,
+    filterable: false,
+    renderCell: (params) => {
+      const elektrika = params.row.zacetno_stanje_elektrike;
+      const voda = params.row.zacetno_stanje_vode;
+      if (elektrika == null && voda == null) {
+        return (
+          <Typography sx={{ fontSize: '0.76rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }} noWrap>
+            —
+          </Typography>
+        );
+      }
+      return (
+        <Stack spacing={0.15} sx={{ py: 0.2, width: '100%' }}>
+          <Stack direction="row" spacing={0.45} alignItems="center">
+            <BoltOutlinedIcon sx={{ fontSize: 12, color: '#f59e0b', flexShrink: 0 }} />
+            <Typography sx={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.1 }} noWrap>
+              {elektrika == null ? '—' : elektrika}
+            </Typography>
+          </Stack>
+          <Stack direction="row" spacing={0.45} alignItems="center">
+            <WaterDropOutlinedIcon sx={{ fontSize: 12, color: '#3b82f6', flexShrink: 0 }} />
+            <Typography sx={{ fontSize: '0.68rem', color: '#475569', lineHeight: 1.1 }} noWrap>
+              {voda == null ? '—' : voda}
+            </Typography>
+          </Stack>
+        </Stack>
+      );
+    }
   },
   {
     field: 'cas_info',
@@ -365,11 +497,11 @@ const stolpciSobe = [
   {
     field: 'strosek_ogrevanja',
     headerName: 'Ogrevanje',
-    width: 128,
+    width: 172,
     editable: false,
     type: 'number',
     renderCell: (params) => (
-      <Stack spacing={0.2} alignItems="flex-end" sx={{ width: '100%' }}>
+      <Stack direction="row" spacing={0.55} alignItems="center" justifyContent="flex-end" sx={{ width: '100%' }}>
         <Stack direction="row" spacing={0.4} alignItems="center">
           <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
             {Number(params.value ?? 0).toFixed(2)}
@@ -663,10 +795,22 @@ const stolpciOgrevanjeTipi = [
   {
     field: 'obdobje',
     headerName: 'Obdobje',
-    width: 148,
+    width: 90,
     renderCell: (params) => (
-      <Box sx={{ px: 0.75, py: 0.2, borderRadius: '4px', background: '#f0fdf4', border: '1px solid #a7f3d0', display: 'inline-flex' }}>
-        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#065f46' }}>{params.value}</Typography>
+      <Box
+        sx={{
+          px: 0.75,
+          py: 0.25,
+          borderRadius: '4px',
+          background: '#f0fdf4',
+          border: '1px solid #a7f3d0',
+          display: 'inline-flex',
+          alignItems: 'center'
+        }}
+      >
+        <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#065f46' }}>
+          {params.value}
+        </Typography>
       </Box>
     )
   },

@@ -104,7 +104,7 @@ export default function PrijavaStran() {
                 <HomeOutlinedIcon sx={{ fontSize: 20, color: '#fff' }} />
               </Box>
               <Typography variant="h6" fontWeight={700} color="text.primary">
-                Stanovanja Dovč
+                Sobe Dovč
               </Typography>
             </Stack>
 
