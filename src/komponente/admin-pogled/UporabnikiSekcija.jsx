@@ -9,6 +9,7 @@ import {
   Card,
   CardContent,
   Chip,
+  Divider,
   FormControlLabel,
   IconButton,
   InputAdornment,
@@ -29,6 +30,7 @@ import GppGoodOutlinedIcon from '@mui/icons-material/GppGoodOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
+import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import dayjs from 'dayjs';
 import SearchableSelect from '../SearchableSelect';
 import {
@@ -82,6 +84,8 @@ export default function UporabnikiSekcija({
   stolpciUporabniki,
   izberiUporabnikaZaUrejanje,
   nastaviAktivnostUporabnika,
+  izbrisiUporabnika,
+  prijavljenUporabnikId,
   predlogZacetnihStanjZaNovUporabnik,
   uporabiPredlaganaZacetnaStanja,
   sobaImaVodniStevecZaNovUporabnik
@@ -107,6 +111,43 @@ export default function UporabnikiSekcija({
       (vrstica) => statusPogodbeFilter(vrstica.pogodba_od, vrstica.pogodba_do) === filterPogodbe
     );
   }, [filterPogodbe, vrsticeUporabniki]);
+
+  const stolpciUporabnikiZBrisanjem = useMemo(() => {
+    const stolpecBrisanje = {
+      field: 'akcije_uporabnik',
+      headerName: '',
+      width: 56,
+      sortable: false,
+      filterable: false,
+      disableColumnMenu: true,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => {
+        const jeTrenutniAdmin = params.row?.id === prijavljenUporabnikId;
+        return (
+          <Tooltip title={jeTrenutniAdmin ? 'Prijavljenega admina ni mogoče izbrisati' : 'Izbriši uporabnika'}>
+            <span>
+              <IconButton
+                size="small"
+                color="error"
+                disabled={jeTrenutniAdmin}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  izbrisiUporabnika?.(params.row);
+                }}
+                aria-label="Izbriši uporabnika"
+              >
+                <DeleteOutlineOutlinedIcon sx={{ fontSize: 17 }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        );
+      }
+    };
+
+    const stolpciBrezAkcij = stolpciUporabniki.filter((stolpec) => stolpec.field !== 'akcije_uporabnik');
+    return [...stolpciBrezAkcij, stolpecBrisanje];
+  }, [stolpciUporabniki, izbrisiUporabnika, prijavljenUporabnikId]);
 
   return (
     <Card className="kartica-jeklo" sx={ADMIN_SEKCIJA_CARD_SX}>
@@ -187,11 +228,37 @@ export default function UporabnikiSekcija({
                 </Button>
               </Stack>
 
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                <TextField label="Ime" value={novUporabnik.ime} onChange={(e) => setNovUporabnik({ ...novUporabnik, ime: e.target.value })} required size="small" sx={{ flex: '1 1 200px' }} />
-                <TextField label="Priimek" value={novUporabnik.priimek} onChange={(e) => setNovUporabnik({ ...novUporabnik, priimek: e.target.value })} required size="small" sx={{ flex: '1 1 200px' }} />
-                <TextField label="Telefon" value={novUporabnik.telefon} onChange={(e) => setNovUporabnik({ ...novUporabnik, telefon: e.target.value })} size="small" sx={{ flex: '1 1 160px' }} />
-                <TextField label="Email" type="email" value={novUporabnik.email} onChange={(e) => setNovUporabnik({ ...novUporabnik, email: e.target.value })} required size="small" sx={{ flex: '2 1 260px' }} />
+              {/* ── Osebni podatki ───────────────────────────── */}
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.67rem', display: 'block', mb: 0.75 }}>
+                  Osebni podatki
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                <TextField label="Ime" value={novUporabnik.ime} onChange={(e) => setNovUporabnik({ ...novUporabnik, ime: e.target.value })} required size="small" sx={{ flex: '1 1 150px' }} />
+                <TextField label="Priimek" value={novUporabnik.priimek} onChange={(e) => setNovUporabnik({ ...novUporabnik, priimek: e.target.value })} required size="small" sx={{ flex: '1 1 150px' }} />
+                <TextField label="Telefon" value={novUporabnik.telefon} onChange={(e) => setNovUporabnik({ ...novUporabnik, telefon: e.target.value })} size="small" sx={{ flex: '1 1 130px' }} />
+                <TextField label="Email" type="email" value={novUporabnik.email} onChange={(e) => setNovUporabnik({ ...novUporabnik, email: e.target.value })} required size="small" sx={{ flex: '2 1 220px' }} />
+                </Box>
+              </Box>
+
+              <Divider />
+
+              {/* ── Dostop & soba ─────────────────────────────── */}
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.67rem', display: 'block', mb: 0.75 }}>
+                  Dostop & soba
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'flex-end' }}>
+                <SearchableSelect
+                  label="Soba"
+                  value={novUporabnik.soba_id}
+                  onChange={(novaVrednost) => setNovUporabnik({ ...novUporabnik, soba_id: novaVrednost ?? '' })}
+                  options={[
+                    { value: '', label: 'Brez sobe' },
+                    ...(podatkiSobe ?? []).map((s) => ({ value: s.id, label: s.ime_sobe }))
+                  ]}
+                  sx={{ flex: '1 1 160px' }}
+                />
                 <TextField
                   label={novUporabnik.id ? 'Novo geslo (neobvezno)' : 'Geslo'}
                   type={gesloVidno ? 'text' : 'password'}
@@ -199,7 +266,7 @@ export default function UporabnikiSekcija({
                   onChange={(e) => setNovUporabnik({ ...novUporabnik, geslo: e.target.value })}
                   required={!novUporabnik.id}
                   size="small"
-                  sx={{ flex: '1 1 300px' }}
+                  sx={{ flex: '2 1 280px' }}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
@@ -247,97 +314,53 @@ export default function UporabnikiSekcija({
                     )
                   }}
                 />
-                <SearchableSelect
-                  label="Soba"
-                  value={novUporabnik.soba_id}
-                  onChange={(novaVrednost) => setNovUporabnik({ ...novUporabnik, soba_id: novaVrednost ?? '' })}
-                  options={[
-                    { value: '', label: 'Brez sobe' },
-                    ...(podatkiSobe ?? []).map((s) => ({ value: s.id, label: s.ime_sobe }))
-                  ]}
-                  sx={{ flex: '1 1 180px' }}
-                />
-                <TextField
-                  label="Začetno stanje elektrike"
-                  type="number"
-                  value={novUporabnik.zacetno_stanje_elektrike ?? ''}
-                  onChange={(e) =>
-                    setNovUporabnik({ ...novUporabnik, zacetno_stanje_elektrike: e.target.value })
-                  }
-                  size="small"
-                  sx={{ flex: '1 1 170px' }}
-                  inputProps={{ min: 0, step: 1 }}
-                  helperText={predlogZacetnihStanjZaNovUporabnik?.stanje_elektrike != null
-                    ? `Predlog: ${predlogZacetnihStanjZaNovUporabnik.stanje_elektrike}`
-                    : 'Vnesi ob primopredaji'}
-                />
-                <TextField
-                  label="Začetno stanje vode"
-                  type="number"
-                  value={novUporabnik.zacetno_stanje_vode ?? ''}
-                  onChange={(e) =>
-                    setNovUporabnik({ ...novUporabnik, zacetno_stanje_vode: e.target.value })
-                  }
-                  size="small"
-                  sx={{ flex: '1 1 170px' }}
-                  inputProps={{ min: 0, step: 1 }}
-                  disabled={!sobaImaVodniStevecZaNovUporabnik}
-                  helperText={!sobaImaVodniStevecZaNovUporabnik
-                    ? 'Soba nima vodnega števca'
-                    : (predlogZacetnihStanjZaNovUporabnik?.stanje_vode != null
-                      ? `Predlog: ${predlogZacetnihStanjZaNovUporabnik.stanje_vode}`
-                      : 'Vnesi ob primopredaji')}
-                />
-                <Tooltip title="Pridobi zadnje vrednosti števca za to sobo">
-                  <span>
-                    <IconButton
-                      type="button"
-                      size="small"
-                      color="primary"
-                      onClick={uporabiPredlaganaZacetnaStanja}
-                      disabled={!predlogZacetnihStanjZaNovUporabnik}
-                      aria-label="Uporabi zadnji odčitek sobe"
-                      sx={{
-                        alignSelf: 'flex-start',
-                        mt: 0.25,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderRadius: '8px',
-                        backgroundColor: 'background.paper',
-                        '&:hover': {
-                          backgroundColor: 'action.hover'
-                        }
-                      }}
-                    >
-                      <RefreshOutlinedIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                <DatePicker
-                  label="Uporabnik od"
-                  value={novUporabnik.uporabnik_od ? dayjs(novUporabnik.uporabnik_od) : null}
-                  onChange={(novaVrednost) =>
-                    setNovUporabnik({
-                      ...novUporabnik,
-                      uporabnik_od: novaVrednost ? novaVrednost.format('YYYY-MM-DD') : ''
-                    })
-                  }
-                  slotProps={{
-                    textField: {
-                      size: 'small',
-                      sx: {
-                        flex: '1 1 150px',
-                        '& .MuiInputLabel-root': { fontSize: '0.8rem' },
-                        '& .MuiInputLabel-root.MuiInputLabel-shrink': { fontSize: '0.74rem' },
-                        '& .MuiInputBase-input': { fontSize: '0.82rem' },
-                        '& .MuiPickersSectionList-root': { fontSize: '0.82rem' },
-                        '& .MuiPickersSectionList-section': { fontSize: '0.82rem' },
-                        '& .MuiPickersInputBase-input': { fontSize: '0.82rem' }
-                      }
+                <Stack direction="row" alignItems="center" gap={0.5} sx={{ pb: 0.25 }}>
+                  <FormControlLabel
+                    control={<Switch size="small" checked={novUporabnik.admin} onChange={(e) => setNovUporabnik({ ...novUporabnik, admin: e.target.checked })} />}
+                    label="Admin"
+                    sx={{ ml: 0 }}
+                  />
+                  <FormControlLabel
+                    control={<Switch size="small" checked={novUporabnik.aktiven} onChange={(e) => nastaviAktivnostUporabnika(e.target.checked)} />}
+                    label="Aktiven"
+                    sx={{ ml: 0 }}
+                  />
+                </Stack>
+                </Box>
+              </Box>
+
+              <Divider />
+
+              {/* ── Datumi ───────────────────────────────────── */}
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.67rem', display: 'block', mb: 0.75 }}>
+                  Datumi
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  <DatePicker
+                    label="Uporabnik od"
+                    value={novUporabnik.uporabnik_od ? dayjs(novUporabnik.uporabnik_od) : null}
+                    onChange={(novaVrednost) =>
+                      setNovUporabnik({
+                        ...novUporabnik,
+                        uporabnik_od: novaVrednost ? novaVrednost.format('YYYY-MM-DD') : ''
+                      })
                     }
-                  }}
-                />
-                <Box sx={{ display: 'flex', flex: '2 1 360px', gap: 1, minWidth: 320 }}>
+                    slotProps={{
+                      textField: {
+                        size: 'small',
+                        sx: {
+                          flex: '1 1 150px',
+                          '& .MuiInputLabel-root': { fontSize: '0.8rem' },
+                          '& .MuiInputLabel-root.MuiInputLabel-shrink': { fontSize: '0.74rem' },
+                          '& .MuiInputBase-input': { fontSize: '0.82rem' },
+                          '& .MuiPickersSectionList-root': { fontSize: '0.82rem' },
+                          '& .MuiPickersSectionList-section': { fontSize: '0.82rem' },
+                          '& .MuiPickersInputBase-input': { fontSize: '0.82rem' }
+                        }
+                      }
+                    }}
+                  />
                   <DatePicker
                     label="Pogodba od"
                     value={novUporabnik.pogodba_od ? dayjs(novUporabnik.pogodba_od) : null}
@@ -351,8 +374,7 @@ export default function UporabnikiSekcija({
                       textField: {
                         size: 'small',
                         sx: {
-                          flex: 1,
-                          minWidth: 0,
+                          flex: '1 1 150px',
                           '& .MuiInputLabel-root': { fontSize: '0.8rem' },
                           '& .MuiInputLabel-root.MuiInputLabel-shrink': { fontSize: '0.74rem' },
                           '& .MuiInputBase-input': { fontSize: '0.82rem' },
@@ -376,8 +398,7 @@ export default function UporabnikiSekcija({
                       textField: {
                         size: 'small',
                         sx: {
-                          flex: 1,
-                          minWidth: 0,
+                          flex: '1 1 150px',
                           '& .MuiInputLabel-root': { fontSize: '0.8rem' },
                           '& .MuiInputLabel-root.MuiInputLabel-shrink': { fontSize: '0.74rem' },
                           '& .MuiInputBase-input': { fontSize: '0.82rem' },
@@ -391,18 +412,73 @@ export default function UporabnikiSekcija({
                 </Box>
               </Box>
 
-              <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ ml: '2px' }}>
-                <FormControlLabel
-                  control={<Switch size="small" checked={novUporabnik.admin} onChange={(e) => setNovUporabnik({ ...novUporabnik, admin: e.target.checked })} />}
-                  label="Admin"
-                  sx={{ ml: 0 }}
-                />
-                <FormControlLabel
-                  control={<Switch size="small" checked={novUporabnik.aktiven} onChange={(e) => nastaviAktivnostUporabnika(e.target.checked)} />}
-                  label="Aktiven"
-                  sx={{ ml: 0 }}
-                />
-                <Button type="submit" size="small" variant="contained" className="gumb-jeklo" sx={{ ml: 'auto' }}>
+              <Divider />
+
+              {/* ── Začetna stanja števcev ────────────────────── */}
+              <Box>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.67rem', display: 'block', mb: 0.75 }}>
+                  Začetna stanja števcev
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'flex-start' }}>
+                  <TextField
+                    label="Začetno stanje elektrike"
+                    type="number"
+                    value={novUporabnik.zacetno_stanje_elektrike ?? ''}
+                    onChange={(e) =>
+                      setNovUporabnik({ ...novUporabnik, zacetno_stanje_elektrike: e.target.value })
+                    }
+                    size="small"
+                    sx={{ flex: '1 1 170px' }}
+                    inputProps={{ min: 0, step: 1 }}
+                    helperText={predlogZacetnihStanjZaNovUporabnik?.stanje_elektrike != null
+                      ? `Predlog: ${predlogZacetnihStanjZaNovUporabnik.stanje_elektrike}`
+                      : 'Vnesi ob primopredaji'}
+                  />
+                  <TextField
+                    label="Začetno stanje vode"
+                    type="number"
+                    value={novUporabnik.zacetno_stanje_vode ?? ''}
+                    onChange={(e) =>
+                      setNovUporabnik({ ...novUporabnik, zacetno_stanje_vode: e.target.value })
+                    }
+                    size="small"
+                    sx={{ flex: '1 1 170px' }}
+                    inputProps={{ min: 0, step: 1 }}
+                    disabled={!sobaImaVodniStevecZaNovUporabnik}
+                    helperText={!sobaImaVodniStevecZaNovUporabnik
+                      ? 'Soba nima vodnega števca'
+                      : (predlogZacetnihStanjZaNovUporabnik?.stanje_vode != null
+                        ? `Predlog: ${predlogZacetnihStanjZaNovUporabnik.stanje_vode}`
+                        : 'Vnesi ob primopredaji')}
+                  />
+                  <Tooltip title="Pridobi zadnje vrednosti števca za to sobo">
+                    <span>
+                      <IconButton
+                        type="button"
+                        size="small"
+                        color="primary"
+                        onClick={uporabiPredlaganaZacetnaStanja}
+                        disabled={!predlogZacetnihStanjZaNovUporabnik}
+                        aria-label="Uporabi zadnji odčitek sobe"
+                        sx={{
+                          mt: 0.25,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: '8px',
+                          backgroundColor: 'background.paper',
+                          '&:hover': { backgroundColor: 'action.hover' }
+                        }}
+                      >
+                        <RefreshOutlinedIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Box>
+              </Box>
+
+              {/* ── Shrani ───────────────────────────────────── */}
+              <Stack direction="row" justifyContent="flex-end">
+                <Button type="submit" size="small" variant="contained" className="gumb-jeklo">
                   Shrani uporabnika
                 </Button>
               </Stack>
@@ -517,7 +593,7 @@ export default function UporabnikiSekcija({
             <DataGrid
               sx={ADMIN_DATAGRID_FLEKS_SX}
               rows={vrsticeUporabnikiFiltrirane}
-              columns={stolpciUporabniki}
+              columns={stolpciUporabnikiZBrisanjem}
               density="compact"
               rowHeight={68}
               columnHeaderHeight={48}

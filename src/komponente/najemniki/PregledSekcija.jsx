@@ -2,6 +2,7 @@
  * Sekcija "Pregled & Vnos" za najemnika.
  * Prikazuje trenutne stroške, vnos števcev in razčlenitev stroškov.
  */
+import { useState } from 'react';
 import {
   Alert,
   Box,
@@ -10,6 +11,10 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Grid,
   InputAdornment,
@@ -24,26 +29,56 @@ import HomeWorkOutlinedIcon from '@mui/icons-material/HomeWorkOutlined';
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined';
+import SearchableSelect from '../SearchableSelect';
 import StrosekVrstica from './StrosekVrstica';
 
 export default function PregledSekcija({
   prijavljenNaziv,
   sobaNaziv,
+  prikaziPogodbo,
+  pogodbaOdFormat,
+  pogodbaDoFormat,
+  moznostiObdobijZaVnos,
   imaVodniStevec,
   denar,
   trenutniPrikaz,
   vnosStevca,
+  spremeniObdobjeVnosa,
   jeOgrevanjeZaklenjeno,
   sporociloZaklepaOgrevanja,
+  jeObdobjeZeOddano,
+  sporociloZeOddano,
   predogledStevca,
   setVnosStevca,
   napakaStevec,
   uspehStevec,
   shranjevanjeStevca,
   potrjevanjeObracuna,
-  shraniStevce,
   potrdiObracun
 }) {
+  const [dialogPotrditevOdprt, setDialogPotrditevOdprt] = useState(false);
+  const obdelavaPotrditve = shranjevanjeStevca || potrjevanjeObracuna;
+  const imenaMesecov = [
+    'januar',
+    'februar',
+    'marec',
+    'april',
+    'maj',
+    'junij',
+    'julij',
+    'avgust',
+    'september',
+    'oktober',
+    'november',
+    'december'
+  ];
+  const nazivObdobjaPotrditve = `${imenaMesecov[Number(vnosStevca.mesec) - 1] ?? String(vnosStevca.mesec)} ${vnosStevca.leto}`;
+
+  async function potrdiIzDialoga() {
+    setDialogPotrditevOdprt(false);
+    await potrdiObracun();
+  }
+
   return (
     <Stack spacing={2.5}>
       {/* Pozdravna glava */}
@@ -54,6 +89,34 @@ export default function PregledSekcija({
         <Stack direction="row" spacing={1} mt={1} flexWrap="wrap" useFlexGap>
           <Chip size="small" color="primary" icon={<HomeWorkOutlinedIcon sx={{ fontSize: 13 }} />} label={`Soba: ${sobaNaziv}`} />
         </Stack>
+        {prikaziPogodbo && (
+          <Box
+            sx={{
+              mt: 1.25,
+              px: 1.25,
+              py: 1,
+              borderRadius: '8px',
+              border: '1px solid rgba(15,23,42,0.09)',
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
+            }}
+          >
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.75} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+              <Stack direction="row" spacing={0.6} alignItems="center">
+                <CalendarMonthOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}
+                >
+                  Veljavnost pogodbe
+                </Typography>
+              </Stack>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {pogodbaOdFormat} - {pogodbaDoFormat}
+              </Typography>
+            </Stack>
+          </Box>
+        )}
       </Box>
 
       {/* Statistične kartice */}
@@ -84,54 +147,6 @@ export default function PregledSekcija({
                 </Typography>
               </Box>
             </Grid>
-
-            <Grid size={{ xs: 6, sm: 3, md: 2 }}>
-              <Box className="stat-kartica">
-                <Stack direction="row" alignItems="center" spacing={0.5} mb={0.5}>
-                  <HomeWorkOutlinedIcon sx={{ fontSize: 14, color: '#059669' }} />
-                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.04em', fontWeight: 600 }}>
-                    Najemnina
-                  </Typography>
-                </Stack>
-                <Typography variant="h6" fontWeight={700}>{denar(trenutniPrikaz.najemnina)}</Typography>
-              </Box>
-            </Grid>
-
-            <Grid size={{ xs: 6, sm: 3, md: 2 }}>
-              <Box className="stat-kartica">
-                <Stack direction="row" alignItems="center" spacing={0.5} mb={0.5}>
-                  <BoltOutlinedIcon sx={{ fontSize: 14, color: '#f59e0b' }} />
-                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.04em', fontWeight: 600 }}>
-                    Elektrika
-                  </Typography>
-                </Stack>
-                <Typography variant="h6" fontWeight={700}>{denar(trenutniPrikaz.strosekElektrike)}</Typography>
-              </Box>
-            </Grid>
-
-            <Grid size={{ xs: 6, sm: 3, md: 2 }}>
-              <Box className="stat-kartica">
-                <Stack direction="row" alignItems="center" spacing={0.5} mb={0.5}>
-                  <WaterDropOutlinedIcon sx={{ fontSize: 14, color: '#3b82f6' }} />
-                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.04em', fontWeight: 600 }}>
-                    Voda
-                  </Typography>
-                </Stack>
-                <Typography variant="h6" fontWeight={700}>{denar(trenutniPrikaz.strosekVode)}</Typography>
-              </Box>
-            </Grid>
-
-            <Grid size={{ xs: 6, sm: 3, md: 2 }}>
-              <Box className="stat-kartica">
-                <Stack direction="row" alignItems="center" spacing={0.5} mb={0.5}>
-                  <WhatshotOutlinedIcon sx={{ fontSize: 14, color: '#d97706' }} />
-                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.04em', fontWeight: 600 }}>
-                    Ogrevanje
-                  </Typography>
-                </Stack>
-                <Typography variant="h6" fontWeight={700}>{denar(trenutniPrikaz.strosekOgrevanja)}</Typography>
-              </Box>
-            </Grid>
           </Grid>
         </Box>
       )}
@@ -141,26 +156,43 @@ export default function PregledSekcija({
         <Grid size={{ xs: 12, md: 6 }}>
           <Card className="kartica-jeklo" sx={{ height: '100%' }}>
             <CardContent>
-              <Stack component="form" spacing={2} onSubmit={shraniStevce}>
+              <Stack spacing={2}>
                 <Box>
                   <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
                     <SpeedOutlinedIcon sx={{ color: 'primary.main', fontSize: 20 }} />
                     <Typography variant="h6">Vnos stanja števcev</Typography>
                   </Stack>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    <Chip
-                      size="small"
-                      icon={<CalendarMonthOutlinedIcon sx={{ fontSize: 12 }} />}
-                      label={`Obdobje: ${String(vnosStevca.mesec).padStart(2, '0')}.${vnosStevca.leto}`}
-                      variant="outlined"
-                      color="primary"
-                    />
+                  <Stack spacing={0.75}>
+                    <Stack direction="row" spacing={0.6} alignItems="center">
+                      <CalendarMonthOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}
+                      >
+                        Obračunsko obdobje
+                      </Typography>
+                    </Stack>
+                    <Box sx={{ width: { xs: '100%', sm: 220 } }}>
+                      <SearchableSelect
+                        label="Obdobje"
+                        value={`${vnosStevca.mesec}|${vnosStevca.leto}`}
+                        onChange={spremeniObdobjeVnosa}
+                        options={moznostiObdobijZaVnos}
+                        disableClearable
+                      />
+                    </Box>
                   </Stack>
                 </Box>
 
                 {jeOgrevanjeZaklenjeno && (
                   <Alert severity="warning" sx={{ borderRadius: '6px' }}>
                     {sporociloZaklepaOgrevanja}
+                  </Alert>
+                )}
+                {jeObdobjeZeOddano && (
+                  <Alert severity="info" sx={{ borderRadius: '6px' }}>
+                    {sporociloZeOddano}
                   </Alert>
                 )}
 
@@ -255,29 +287,17 @@ export default function PregledSekcija({
                 {napakaStevec && <Alert severity="error">{napakaStevec}</Alert>}
                 {uspehStevec && <Alert severity="success">{uspehStevec}</Alert>}
 
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                  <Button
-                    type="submit"
-                    variant="outlined"
-                    color="primary"
-                    fullWidth
-                    disabled={shranjevanjeStevca || potrjevanjeObracuna || jeOgrevanjeZaklenjeno}
-                    startIcon={shranjevanjeStevca ? <CircularProgress size={16} color="inherit" /> : null}
-                  >
-                    {shranjevanjeStevca ? 'Shranjujem...' : 'Shrani števce'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="contained"
-                    color="primary"
-                    fullWidth
-                    onClick={potrdiObracun}
-                    disabled={shranjevanjeStevca || potrjevanjeObracuna || jeOgrevanjeZaklenjeno}
-                    startIcon={potrjevanjeObracuna ? <CircularProgress size={16} color="inherit" /> : null}
-                  >
-                    {potrjevanjeObracuna ? 'Potrjujem...' : 'Potrdi obračun'}
-                  </Button>
-                </Stack>
+                <Button
+                  type="button"
+                  variant="contained"
+                  color="primary"
+                  fullWidth
+                  onClick={() => setDialogPotrditevOdprt(true)}
+                  disabled={obdelavaPotrditve || jeOgrevanjeZaklenjeno || jeObdobjeZeOddano}
+                  startIcon={obdelavaPotrditve ? <CircularProgress size={16} color="inherit" /> : null}
+                >
+                  {obdelavaPotrditve ? 'Potrjujem...' : 'Potrdi'}
+                </Button>
               </Stack>
             </CardContent>
           </Card>
@@ -305,6 +325,11 @@ export default function PregledSekcija({
                       vrednost={denar(trenutniPrikaz.strosekVode)}
                       ikona={<WaterDropOutlinedIcon sx={{ fontSize: 15, color: '#3b82f6' }} />}
                     />
+                    <StrosekVrstica
+                      label="Ogrevanje"
+                      vrednost={denar(trenutniPrikaz.strosekOgrevanja)}
+                      ikona={<WhatshotOutlinedIcon sx={{ fontSize: 15, color: '#d97706' }} />}
+                    />
 
                     <Divider sx={{ my: 1 }} />
 
@@ -312,7 +337,6 @@ export default function PregledSekcija({
                     <StrosekVrstica label="Skupni stroški" vrednost={denar(trenutniPrikaz.strosekSkupni)} />
                     <StrosekVrstica label="NetTV" vrednost={denar(trenutniPrikaz.strosekNeta)} />
                     <StrosekVrstica label="Fiksni" vrednost={denar(trenutniPrikaz.strosekTv)} />
-                    <StrosekVrstica label="Ogrevanje" vrednost={denar(trenutniPrikaz.strosekOgrevanja)} />
 
                     <Divider sx={{ my: 1 }} />
 
@@ -341,6 +365,30 @@ export default function PregledSekcija({
           </Card>
         </Grid>
       </Grid>
+
+      <Dialog
+        open={dialogPotrditevOdprt}
+        onClose={() => {
+          if (!obdelavaPotrditve) setDialogPotrditevOdprt(false);
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Shrani in potrdi obračun</DialogTitle>
+        <DialogContent dividers>
+          <Typography>
+            Ali želite shraniti števce in potrditi obračun za <strong>{nazivObdobjaPotrditve}</strong>?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogPotrditevOdprt(false)} disabled={obdelavaPotrditve}>
+            Prekliči
+          </Button>
+          <Button variant="contained" className="gumb-jeklo" onClick={potrdiIzDialoga} disabled={obdelavaPotrditve}>
+            Potrdi
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

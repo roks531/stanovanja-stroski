@@ -1,6 +1,13 @@
 import { Autocomplete, Box, IconButton, TextField, Tooltip } from '@mui/material';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
+// Poenotimo primerjavo številskih/niznih ID-jev, da izbrana oznaka ostane vidna tudi ob menjavi tipa vrednosti.
+function enakaVrednost(a, b) {
+  if (Object.is(a, b)) return true;
+  if (a == null || b == null) return false;
+  return String(a) === String(b);
+}
+
 export default function SearchableSelect({
   label,
   value,
@@ -17,7 +24,7 @@ export default function SearchableSelect({
   sx
 }) {
   const seznam = options ?? [];
-  const izbran = seznam.find((opt) => Object.is(opt.value, value)) ?? null;
+  const izbran = seznam.find((opt) => enakaVrednost(opt.value, value)) ?? null;
 
   return (
     <Box
@@ -41,7 +48,7 @@ export default function SearchableSelect({
         value={izbran}
         onChange={(_, novaVrednost) => onChange(novaVrednost ? novaVrednost.value : '')}
         getOptionLabel={(option) => String(option?.label ?? '')}
-        isOptionEqualToValue={(option, izbrana) => Object.is(option.value, izbrana.value)}
+        isOptionEqualToValue={(option, izbrana) => enakaVrednost(option.value, izbrana.value)}
         fullWidth={fullWidth}
         disableClearable={disableClearable}
         disabled={disabled}

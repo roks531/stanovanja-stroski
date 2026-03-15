@@ -493,27 +493,31 @@ const stolpciSobe = [
   { field: 'nettv',          headerName: 'NetTV',    width: 96,  editable: true, type: 'number', renderCell: renderDenarCelica },
   { field: 'fiksni',         headerName: 'Fiksni',   width: 96,  editable: true, type: 'number', renderCell: renderDenarCelica },
 
-  // ── Ogrevanje + Faktor ──────────────────────────────────────
+  // ── Ogrevanje + Delež ──────────────────────────────────────
   {
     field: 'strosek_ogrevanja',
     headerName: 'Ogrevanje',
     width: 172,
     editable: false,
     type: 'number',
+    align: 'center',
+    headerAlign: 'center',
     renderCell: (params) => (
-      <Stack direction="row" spacing={0.55} alignItems="center" justifyContent="flex-end" sx={{ width: '100%' }}>
-        <Stack direction="row" spacing={0.4} alignItems="center">
-          <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-            {Number(params.value ?? 0).toFixed(2)}
-          </Typography>
-          <EuroSymbolOutlinedIcon sx={{ fontSize: 12, color: '#d97706' }} />
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Stack direction="row" spacing={0.55} alignItems="center">
+          <Stack direction="row" spacing={0.4} alignItems="center">
+            <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+              {Number(params.value ?? 0).toFixed(2)}
+            </Typography>
+            <EuroSymbolOutlinedIcon sx={{ fontSize: 12, color: '#d97706' }} />
+          </Stack>
+          <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', background: '#fffbeb', border: '1px solid #fde68a', display: 'inline-flex' }}>
+            <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: '#92400e', fontVariantNumeric: 'tabular-nums' }}>
+              delež {Number(params.row.faktor_ogrevanja ?? 0).toFixed(4)}
+            </Typography>
+          </Box>
         </Stack>
-        <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', background: '#fffbeb', border: '1px solid #fde68a', display: 'inline-flex' }}>
-          <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: '#92400e', fontVariantNumeric: 'tabular-nums' }}>
-            ×{Number(params.row.faktor_ogrevanja ?? 1).toFixed(2)}
-          </Typography>
-        </Box>
-      </Stack>
+      </Box>
     )
   },
 
@@ -581,13 +585,17 @@ const stolpciCene = [
     field: 'velja_od',
     headerName: 'Velja od',
     width: 130,
+    align: 'center',
+    headerAlign: 'center',
     renderCell: (params) => (
-      <Stack direction="row" spacing={0.5} alignItems="center">
-        <CalendarTodayOutlinedIcon sx={{ fontSize: 12, color: '#94a3b8', flexShrink: 0 }} />
-        <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: '#374151' }}>
-          {params.value ?? '—'}
-        </Typography>
-      </Stack>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <CalendarTodayOutlinedIcon sx={{ fontSize: 12, color: '#94a3b8', flexShrink: 0 }} />
+          <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: '#374151' }}>
+            {params.value ?? '—'}
+          </Typography>
+        </Stack>
+      </Box>
     )
   },
 
@@ -596,6 +604,8 @@ const stolpciCene = [
     field: 'cena_elektrike',
     headerName: 'Elektrika',
     width: 148,
+    align: 'center',
+    headerAlign: 'center',
     renderHeader: () => (
       <Stack direction="row" spacing={0.5} alignItems="center">
         <BoltOutlinedIcon sx={{ fontSize: 14, color: '#f59e0b' }} />
@@ -606,13 +616,15 @@ const stolpciCene = [
       </Stack>
     ),
     renderCell: (params) => (
-      <Stack direction="row" spacing={0.5} alignItems="center">
-        <BoltOutlinedIcon sx={{ fontSize: 13, color: '#f59e0b', flexShrink: 0 }} />
-        <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#92400e' }}>
-          {Number(params.value ?? 0).toFixed(4)}
-        </Typography>
-        <Typography sx={{ fontSize: '0.68rem', color: '#94a3b8' }}>€/kWh</Typography>
-      </Stack>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <BoltOutlinedIcon sx={{ fontSize: 13, color: '#f59e0b', flexShrink: 0 }} />
+          <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#92400e' }}>
+            {Number(params.value ?? 0).toFixed(4)}
+          </Typography>
+          <Typography sx={{ fontSize: '0.68rem', color: '#94a3b8' }}>€/kWh</Typography>
+        </Stack>
+      </Box>
     )
   },
 
@@ -621,6 +633,8 @@ const stolpciCene = [
     field: 'cena_vode',
     headerName: 'Voda',
     width: 148,
+    align: 'center',
+    headerAlign: 'center',
     renderHeader: () => (
       <Stack direction="row" spacing={0.5} alignItems="center">
         <WaterDropOutlinedIcon sx={{ fontSize: 14, color: '#3b82f6' }} />
@@ -631,13 +645,15 @@ const stolpciCene = [
       </Stack>
     ),
     renderCell: (params) => (
-      <Stack direction="row" spacing={0.5} alignItems="center">
-        <WaterDropOutlinedIcon sx={{ fontSize: 13, color: '#3b82f6', flexShrink: 0 }} />
-        <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#1d4ed8' }}>
-          {Number(params.value ?? 0).toFixed(4)}
-        </Typography>
-        <Typography sx={{ fontSize: '0.68rem', color: '#94a3b8' }}>€/m³</Typography>
-      </Stack>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <WaterDropOutlinedIcon sx={{ fontSize: 13, color: '#3b82f6', flexShrink: 0 }} />
+          <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#1d4ed8' }}>
+            {Number(params.value ?? 0).toFixed(4)}
+          </Typography>
+          <Typography sx={{ fontSize: '0.68rem', color: '#94a3b8' }}>€/m³</Typography>
+        </Stack>
+      </Box>
     )
   }
 ];
@@ -689,6 +705,8 @@ const stolpciAdminStevci = [
     field: 'stanje_elektrike_prej',
     headerName: 'E prej',
     width: 90,
+    align: 'center',
+    headerAlign: 'center',
     renderHeader: () => (
       <Stack direction="row" spacing={0.4} alignItems="center">
         <BoltOutlinedIcon sx={{ fontSize: 13, color: '#f59e0b' }} />
@@ -696,15 +714,19 @@ const stolpciAdminStevci = [
       </Stack>
     ),
     renderCell: (params) => (
-      <Typography sx={{ fontSize: '0.78rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
-        {params.value ?? '—'}
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Typography sx={{ fontSize: '0.78rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
+          {params.value ?? '—'}
+        </Typography>
+      </Box>
     )
   },
   {
     field: 'stanje_elektrike',
     headerName: 'E novo',
     width: 90,
+    align: 'center',
+    headerAlign: 'center',
     renderHeader: () => (
       <Stack direction="row" spacing={0.4} alignItems="center">
         <BoltOutlinedIcon sx={{ fontSize: 13, color: '#f59e0b' }} />
@@ -712,9 +734,11 @@ const stolpciAdminStevci = [
       </Stack>
     ),
     renderCell: (params) => (
-      <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400e', fontVariantNumeric: 'tabular-nums' }}>
-        {params.value ?? '—'}
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400e', fontVariantNumeric: 'tabular-nums' }}>
+          {params.value ?? '—'}
+        </Typography>
+      </Box>
     )
   },
 
@@ -723,6 +747,8 @@ const stolpciAdminStevci = [
     field: 'stanje_vode_prej',
     headerName: 'V prej',
     width: 90,
+    align: 'center',
+    headerAlign: 'center',
     renderHeader: () => (
       <Stack direction="row" spacing={0.4} alignItems="center">
         <WaterDropOutlinedIcon sx={{ fontSize: 13, color: '#3b82f6' }} />
@@ -730,15 +756,19 @@ const stolpciAdminStevci = [
       </Stack>
     ),
     renderCell: (params) => (
-      <Typography sx={{ fontSize: '0.78rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
-        {params.value ?? '—'}
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Typography sx={{ fontSize: '0.78rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
+          {params.value ?? '—'}
+        </Typography>
+      </Box>
     )
   },
   {
     field: 'stanje_vode',
     headerName: 'V novo',
     width: 90,
+    align: 'center',
+    headerAlign: 'center',
     renderHeader: () => (
       <Stack direction="row" spacing={0.4} alignItems="center">
         <WaterDropOutlinedIcon sx={{ fontSize: 13, color: '#3b82f6' }} />
@@ -746,9 +776,12 @@ const stolpciAdminStevci = [
       </Stack>
     ),
     renderCell: (params) => (
-      params.value == null
-        ? <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8' }}>—</Typography>
-        : <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: '#1d4ed8', fontVariantNumeric: 'tabular-nums' }}>{params.value}</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        {params.value == null
+          ? <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8' }}>—</Typography>
+          : <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: '#1d4ed8', fontVariantNumeric: 'tabular-nums' }}>{params.value}</Typography>
+        }
+      </Box>
     )
   },
 
@@ -820,21 +853,23 @@ const stolpciOgrevanjeTipi = [
     field: 'znesek',
     headerName: 'Ogrevanje €',
     width: 140,
-    align: 'right',
-    headerAlign: 'right',
+    align: 'center',
+    headerAlign: 'center',
     renderCell: (params) => (
-      <Typography
-        sx={{
-          fontSize: '0.92rem',
-          fontWeight: 800,
-          color: '#d97706',
-          fontVariantNumeric: 'tabular-nums',
-          letterSpacing: '-0.01em',
-        }}
-        noWrap
-      >
-        {Number(params.value ?? 0).toFixed(2)} €
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Typography
+          sx={{
+            fontSize: '0.92rem',
+            fontWeight: 800,
+            color: '#d97706',
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: '-0.01em',
+          }}
+          noWrap
+        >
+          {Number(params.value ?? 0).toFixed(2)} €
+        </Typography>
+      </Box>
     )
   },
 

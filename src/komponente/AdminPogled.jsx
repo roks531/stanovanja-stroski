@@ -11,7 +11,7 @@
  *   3 – Ogrevanje
  *   4 – Obračuni najemnikov
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Box, Typography } from '@mui/material';
 // Ikone za stranski meni
 import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined';
@@ -19,6 +19,7 @@ import MeetingRoomOutlinedIcon from '@mui/icons-material/MeetingRoomOutlined';
 import ElectricBoltOutlinedIcon from '@mui/icons-material/ElectricBoltOutlined';
 import WhatshotOutlinedIcon from '@mui/icons-material/WhatshotOutlined';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
+import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import dayjs from 'dayjs';
 import { useAvtentikacija } from '../kontekst/AvtentikacijaKontekst';
 import AppLayout from './AppLayout';
@@ -27,7 +28,9 @@ import SobeSekcija from './admin-pogled/SobeSekcija';
 import CeneStevciSekcija from './admin-pogled/CeneStevciSekcija';
 import OgrevanjeSekcija from './admin-pogled/OgrevanjeSekcija';
 import ObracuniSekcija from './admin-pogled/ObracuniSekcija';
+import ObvestilaSekcija from './admin-pogled/ObvestilaSekcija';
 import AdminDialogi from './admin-pogled/AdminDialogi';
+import PotrditveniDialog from './PotrditveniDialog';
 import {
   stolpciUporabniki,
   tipiHise,
@@ -48,11 +51,14 @@ import {
   lokalizacijaMreze
 } from './admin-pogled/konfiguracijaAdminMrez';
 import { izvoziXlsxDatoteko } from '../storitve/izvozXlsx';
-import { normalizirajFaktorOgrevanja, razdeliOgrevanjePoSobah } from '../storitve/ogrevanje';
+import { normalizirajDelezOgrevanja, razdeliOgrevanjePoSobah } from '../storitve/ogrevanje';
 import {
   shraniUporabnikaZAuth,
+  izbrisiUporabnikaZAuth as izbrisiUporabnikaZAuthStoritev,
   dodajCeno,
   izbrisiCeno as izbrisiCenoStoritev,
+  izbrisiOgrevanjeTip as izbrisiOgrevanjeTipStoritev,
+  izbrisiObracun as izbrisiObracunStoritev,
   shraniSobo as shraniSoboStoritev,
   pridobiAdminPodatke,
   shraniOgrevanjeTip,
@@ -60,11 +66,13 @@ import {
   potrdiVsaOdprtaPlacila,
   pripraviPrejsnjeObracunskoObdobje,
   osveziSobeOgrevanjePoObdobju,
-  shraniAdminOdcitekSobe
+  shraniAdminOdcitekSobe,
+  izbrisiAdminOdcitekSobe as izbrisiAdminOdcitekSobeStoritev
 } from '../storitve/podatki';
 
 const KLJUC_ADMIN_TAB = 'stanovanja_admin_tab';
 const KLJUC_ADMIN_CENE_STEVCI_PODTAB = 'stanovanja_admin_cene_stevci_podtab';
+const DOVOLJENI_ADMIN_TABI = [0, 1, 2, 3, 4, 5];
 
 function preberiStevilkoIzStorage(kljuc, privzeto, dovoljeneVrednosti) {
   if (typeof window === 'undefined') return privzeto;
@@ -79,7 +87,7 @@ function preberiStevilkoIzStorage(kljuc, privzeto, dovoljeneVrednosti) {
 export default function AdminPogled() {
   const { seja, profil, odjava, osveziProfil } = useAvtentikacija();
   const [tab, setTab] = useState(() =>
-    preberiStevilkoIzStorage(KLJUC_ADMIN_TAB, 0, [0, 1, 2, 3, 4])
+    preberiStevilkoIzStorage(KLJUC_ADMIN_TAB, 0, DOVOLJENI_ADMIN_TABI)
   );
   const [nalaganje, setNalaganje] = useState(true);
   const [napaka, setNapaka] = useState('');
@@ -93,7 +101,9 @@ export default function AdminPogled() {
     mesec: null,
     leto: null,
     nazivObdobja: '',
-    tipi: [],
+    tipiHise: [],
+    manjkajociTipi: [],
+    potrdiTipi: [],
     vrednosti: {}
   });
   const [gesloVidno, setGesloVidno] = useState(true);
@@ -170,7 +180,7 @@ export default function AdminPogled() {
     strosek_skupni: 0,
     nettv: 0,
     fiksni: 0,
-    faktor_ogrevanja: 1
+    faktor_ogrevanja: 0
   });
 
   const [novaCena, setNovaCena] = useState({
@@ -197,16 +207,46 @@ export default function AdminPogled() {
   });
   const [dialogPotrdiVse, setDialogPotrdiVse] = useState({ odprt: false, stevilo: 0, ids: [] });
   const [obdelujemPotrdiVse, setObdelujemPotrdiVse] = useState(false);
-  const [dialogZePripravljeno, setDialogZePripravljeno] = useState({ odprt: false, nazivObdobja: '' });
   const [filterStevciSoba, setFilterStevciSoba] = useState('');
   const [novStevecAdmin, setNovStevecAdmin] = useState({
     id: '',
     soba_id: '',
     mesec: privzetoObdobje.mesec,
     leto: privzetoObdobje.leto,
+    prejsnje_stanje_elektrike: '',
     stanje_elektrike: '',
+    prejsnje_stanje_vode: '',
     stanje_vode: ''
   });
+  const [dialogBrisanje, setDialogBrisanje] = useState({
+    odprt: false,
+    naslov: '',
+    sporocilo: '',
+    opomba: ''
+  });
+  const [obdelujemBrisanje, setObdelujemBrisanje] = useState(false);
+  // Most med Promise in modalnim potrjevanjem: akcije lahko čakajo na odgovor kot pri klasičnem confirm dialogu.
+  const dialogBrisanjeResolveRef = useRef(null);
+
+  function odpriDialogBrisanja({ naslov, sporocilo, opomba = '' }) {
+    return new Promise((resolve) => {
+      dialogBrisanjeResolveRef.current = resolve;
+      setDialogBrisanje({
+        odprt: true,
+        naslov,
+        sporocilo,
+        opomba
+      });
+    });
+  }
+
+  function zapriDialogBrisanja(potrjeno) {
+    setDialogBrisanje((prej) => ({ ...prej, odprt: false }));
+    if (dialogBrisanjeResolveRef.current) {
+      dialogBrisanjeResolveRef.current(Boolean(potrjeno));
+      dialogBrisanjeResolveRef.current = null;
+    }
+  }
 
   function izberiUporabnikaZaUrejanje(uporabnikId, seznamUporabnikov = podatki.uporabniki) {
     const uporabnik = seznamUporabnikov.find((u) => u.id === uporabnikId);
@@ -252,9 +292,7 @@ export default function AdminPogled() {
       cena_elektrike: cena.cena_elektrike ?? 0,
       cena_vode: cena.cena_vode ?? 0
     });
-    setObvestilo(
-      'Urejanje cene je dovoljeno, dokler cena še ni uporabljena v potrjenem obračunu. V nasprotnem primeru dodaj nov zapis.'
-    );
+    setObvestilo('Urejanje cene je omogočeno. Obračuni ostanejo na svojih shranjenih vrednostih.');
   }
 
   function izberiOgrevanjeZaUrejanje(ogrevanjeId, seznam = podatki.ogrevanjeTipi) {
@@ -285,7 +323,7 @@ export default function AdminPogled() {
       strosek_skupni: Number(soba.strosek_skupni ?? 0),
       nettv: Number(soba.nettv ?? soba.strosek_neta ?? 0),
       fiksni: Number(soba.fiksni ?? soba.strosek_tv ?? 0),
-      faktor_ogrevanja: normalizirajFaktorOgrevanja(soba.faktor_ogrevanja)
+      faktor_ogrevanja: normalizirajDelezOgrevanja(soba.faktor_ogrevanja)
     });
   }
 
@@ -350,7 +388,7 @@ export default function AdminPogled() {
       strosek_skupni: 0,
       nettv: 0,
       fiksni: 0,
-      faktor_ogrevanja: 1
+      faktor_ogrevanja: 0
     });
   }
 
@@ -361,7 +399,9 @@ export default function AdminPogled() {
       soba_id: '',
       mesec: p.mesec,
       leto: p.leto,
+      prejsnje_stanje_elektrike: '',
       stanje_elektrike: '',
+      prejsnje_stanje_vode: '',
       stanje_vode: ''
     });
   }
@@ -375,7 +415,9 @@ export default function AdminPogled() {
       soba_id: odcitek.soba_id ?? '',
       mesec: Number(odcitek.mesec ?? prejsnjiMesecLeto().mesec),
       leto: Number(odcitek.leto ?? prejsnjiMesecLeto().leto),
+      prejsnje_stanje_elektrike: String(odcitek.stanje_elektrike_prej ?? ''),
       stanje_elektrike: String(odcitek.stanje_elektrike ?? ''),
+      prejsnje_stanje_vode: odcitek.stanje_vode_prej == null ? '' : String(odcitek.stanje_vode_prej),
       stanje_vode: odcitek.stanje_vode == null ? '' : String(odcitek.stanje_vode)
     });
   }
@@ -385,20 +427,20 @@ export default function AdminPogled() {
     const skupni = Number(vrednosti.strosek_skupni ?? 0);
     const netTv = Number(vrednosti.nettv ?? 0);
     const fiksni = Number(vrednosti.fiksni ?? 0);
-    const faktorOgrevanja = Number(vrednosti.faktor_ogrevanja ?? 1);
+    const delezOgrevanja = Number(vrednosti.faktor_ogrevanja ?? 0);
     return {
       najemnina,
       skupni,
       netTv,
       fiksni,
-      faktorOgrevanja
+      delezOgrevanja
     };
   }
 
   function pripraviSoboPayload(vrednosti) {
     const imeSobe = String(vrednosti.ime_sobe ?? '').trim();
     const tipHise = String(vrednosti.tip_hise ?? '').trim();
-    const { najemnina, skupni, netTv, fiksni, faktorOgrevanja } = normalizirajSobaStroske(vrednosti);
+    const { najemnina, skupni, netTv, fiksni, delezOgrevanja } = normalizirajSobaStroske(vrednosti);
     const voda = Number(vrednosti.voda ?? 0);
     const imaVodniStevec = sobaImaVodniStevec({ tip_hise: tipHise });
 
@@ -408,7 +450,9 @@ export default function AdminPogled() {
     if (!Number.isFinite(skupni) || skupni < 0) throw new Error('Skupni strosek mora biti 0 ali vec.');
     if (!Number.isFinite(netTv) || netTv < 0) throw new Error('Strosek NetTV mora biti 0 ali vec.');
     if (!Number.isFinite(fiksni) || fiksni < 0) throw new Error('Strosek fiksni mora biti 0 ali vec.');
-    if (!Number.isFinite(faktorOgrevanja) || faktorOgrevanja < 0) throw new Error('Faktor ogrevanja mora biti 0 ali vec.');
+    if (!Number.isFinite(delezOgrevanja) || delezOgrevanja < 0 || delezOgrevanja > 1) {
+      throw new Error('Delež ogrevanja mora biti med 0 in 1 (npr. 0.1900).');
+    }
     if (!Number.isFinite(voda) || voda < 0) throw new Error('Voda mora biti 0 ali vec.');
 
     return {
@@ -422,7 +466,7 @@ export default function AdminPogled() {
       strosek_skupni: skupni,
       nettv: netTv,
       fiksni,
-      faktor_ogrevanja: faktorOgrevanja
+      faktor_ogrevanja: Number(delezOgrevanja.toFixed(4))
     };
   }
 
@@ -435,8 +479,8 @@ export default function AdminPogled() {
     }
   }
 
-  async function nalozi(moznosti = { prikaziNalaganje: true }) {
-    const { prikaziNalaganje } = moznosti;
+  async function nalozi(moznosti = { prikaziNalaganje: true, vrziNapako: false }) {
+    const { prikaziNalaganje, vrziNapako } = moznosti;
     if (prikaziNalaganje) {
       setNalaganje(true);
     }
@@ -446,6 +490,7 @@ export default function AdminPogled() {
       setPodatki(data);
     } catch (err) {
       setNapaka(err.message || 'Napaka pri nalaganju admin podatkov.');
+      if (vrziNapako) throw err;
     } finally {
       if (prikaziNalaganje) {
         setNalaganje(false);
@@ -530,7 +575,7 @@ export default function AdminPogled() {
         strosek_ogrevanja: Number(
           razdelitveOgrevanjaPoTipu.get(s.tip_hise)?.get(s.id) ?? s.strosek_ogrevanja ?? 0
         ),
-        faktor_ogrevanja: normalizirajFaktorOgrevanja(s.faktor_ogrevanja),
+        faktor_ogrevanja: normalizirajDelezOgrevanja(s.faktor_ogrevanja),
         posodobil_ime: s.posodobil ? (uporabnikiPoId.get(s.posodobil) ?? s.posodobil) : '-',
         posodobljeno_oblikovano: s.posodobljeno_ob
           ? dayjs(s.posodobljeno_ob).format('DD.MM.YYYY HH:mm')
@@ -546,66 +591,18 @@ export default function AdminPogled() {
     [podatki]
   );
 
-  // Označi cene, ki so že "zaklenjene" z uporabo v potrjenih obračunih.
+  // Cene so urejljive/brisljive ne glede na potrjene obračune.
   const vrsticeCene = useMemo(() => {
     const cene = podatki.cene ?? [];
-    const placila = (podatki.placila ?? []).filter((placilo) => Boolean(placilo?.placano));
-    const sobePoId = new Map((podatki.sobe ?? []).map((s) => [s.id, s]));
-
-    const placilaDatumiPoTipu = new Map();
-    placila.forEach((placilo) => {
-      const tip = sobePoId.get(placilo.soba_id)?.tip_hise;
-      if (!tip) return;
-      const datumObdobja = dayjs(`${placilo.leto}-${String(placilo.mesec).padStart(2, '0')}-01`);
-      if (!datumObdobja.isValid()) return;
-      if (!placilaDatumiPoTipu.has(tip)) placilaDatumiPoTipu.set(tip, []);
-      placilaDatumiPoTipu.get(tip).push(datumObdobja.startOf('day'));
-    });
-
-    const cenePoTipu = new Map();
-    cene.forEach((cena) => {
-      if (!cena?.tip_hise) return;
-      if (!cenePoTipu.has(cena.tip_hise)) cenePoTipu.set(cena.tip_hise, []);
-      cenePoTipu.get(cena.tip_hise).push(cena);
-    });
-
-    const povezanaCenaPoId = new Map();
-
-    cenePoTipu.forEach((seznamCenTipa, tip) => {
-      const sortirane = [...seznamCenTipa].sort(
-        (a, b) => dayjs(a.velja_od).valueOf() - dayjs(b.velja_od).valueOf()
-      );
-      const datumiPlacil = placilaDatumiPoTipu.get(tip) ?? [];
-
-      sortirane.forEach((cena, index) => {
-        const od = dayjs(cena.velja_od).startOf('day');
-        const naslednjaCena = index < sortirane.length - 1
-          ? dayjs(sortirane[index + 1].velja_od).startOf('day')
-          : null;
-
-        const jePovezana = datumiPlacil.some((datumPlacila) => {
-          if (!od.isValid()) return false;
-          if (datumPlacila.isBefore(od, 'day')) return false;
-          if (naslednjaCena?.isValid() && !datumPlacila.isBefore(naslednjaCena, 'day')) return false;
-          return true;
-        });
-
-        povezanaCenaPoId.set(cena.id, jePovezana);
-      });
-    });
-
-    return cene.map((c) => {
-      const jePovezanaZObracuni = Boolean(povezanaCenaPoId.get(c.id));
-      return {
-        id: c.id,
-        tip_hise: c.tip_hise,
-        velja_od: dayjs(c.velja_od).format('DD.MM.YYYY'),
-        cena_elektrike: Number(c.cena_elektrike).toFixed(4),
-        cena_vode: Number(c.cena_vode).toFixed(4),
-        je_povezana_z_obracuni: jePovezanaZObracuni,
-        se_lahko_brise: !jePovezanaZObracuni
-      };
-    });
+    return cene.map((c) => ({
+      id: c.id,
+      tip_hise: c.tip_hise,
+      velja_od: dayjs(c.velja_od).format('DD.MM.YYYY'),
+      cena_elektrike: Number(c.cena_elektrike).toFixed(4),
+      cena_vode: Number(c.cena_vode).toFixed(4),
+      je_povezana_z_obracuni: false,
+      se_lahko_brise: true
+    }));
   }, [podatki]);
 
   const vrsticeOgrevanjeTipi = useMemo(
@@ -638,16 +635,6 @@ export default function AdminPogled() {
       ])
     );
 
-    const cenePoTipu = (podatki.cene ?? []).reduce((acc, cena) => {
-      if (!acc[cena.tip_hise]) acc[cena.tip_hise] = [];
-      acc[cena.tip_hise].push(cena);
-      return acc;
-    }, {});
-
-    Object.values(cenePoTipu).forEach((seznam) => {
-      seznam.sort((a, b) => dayjs(b.velja_od).valueOf() - dayjs(a.velja_od).valueOf());
-    });
-
     return (podatki.placila ?? []).map((placilo) => {
       const soba = sobePoId.get(placilo.soba_id);
       const uporabnik = placilo.uporabnik_id ? uporabnikiPoId.get(placilo.uporabnik_id) : null;
@@ -656,33 +643,35 @@ export default function AdminPogled() {
         odcitkiPoSobaObdobju.get(`${placilo.soba_id ?? 'null'}|${placilo.mesec}|${placilo.leto}`) ??
         null;
       const tip = soba?.tip_hise ?? null;
-      const ceneTip = tip ? (cenePoTipu[tip] ?? []) : [];
-      const obdobjeDatum = dayjs(`${placilo.leto}-${String(placilo.mesec).padStart(2, '0')}-01`);
-      const cena =
-        ceneTip.find((c) => dayjs(c.velja_od).isSame(obdobjeDatum) || dayjs(c.velja_od).isBefore(obdobjeDatum)) ||
-        ceneTip[0] ||
-        null;
 
-      const prejsnjeStanjeElektrike =
-        odcitek?.prejsnje_stanje_elektrike == null ? 0 : Number(odcitek.prejsnje_stanje_elektrike);
-      const trenutnoStanjeElektrike = Number(odcitek?.stanje_elektrike ?? 0);
-      const prejsnjeStanjeVode =
-        odcitek?.prejsnje_stanje_vode == null ? 0 : Number(odcitek.prejsnje_stanje_vode);
-      const trenutnoStanjeVode = odcitek?.stanje_vode == null ? null : Number(odcitek.stanje_vode);
+      const prejsnjeStanjeElektrike = Number(
+        odcitek?.prejsnje_stanje_elektrike ?? placilo.prejsnje_stanje_elektrike ?? 0
+      );
+      const trenutnoStanjeElektrike = Number(odcitek?.stanje_elektrike ?? placilo.stanje_elektrike ?? 0);
+      const prejsnjeStanjeVode = Number(
+        odcitek?.prejsnje_stanje_vode ?? placilo.prejsnje_stanje_vode ?? 0
+      );
+      const trenutnoStanjeVode = odcitek?.stanje_vode == null
+        ? (placilo.stanje_vode == null ? null : Number(placilo.stanje_vode))
+        : Number(odcitek.stanje_vode);
       const vodaStanje = sobaImaVodniStevec(soba);
       const vodaFiksni = Number(soba?.voda ?? 0);
       const porabaElektrike =
         odcitek?.poraba_elektrike != null
           ? Number(odcitek.poraba_elektrike)
+          : placilo?.poraba_elektrike != null
+            ? Number(placilo.poraba_elektrike)
           : Math.max(0, trenutnoStanjeElektrike - prejsnjeStanjeElektrike);
       const porabaVode =
         odcitek?.poraba_vode != null
           ? Number(odcitek.poraba_vode)
+          : placilo?.poraba_vode != null
+            ? Number(placilo.poraba_vode)
           : vodaStanje && trenutnoStanjeVode != null
             ? Math.max(0, trenutnoStanjeVode - prejsnjeStanjeVode)
           : 0;
-      const cenaElektrike = Number(placilo.cena_elektrike ?? cena?.cena_elektrike ?? 0);
-      const cenaVode = Number(placilo.cena_vode ?? cena?.cena_vode ?? 0);
+      const cenaElektrike = Number(placilo.cena_elektrike ?? 0);
+      const cenaVode = Number(placilo.cena_vode ?? 0);
       const strosekElektrike = Number(placilo.strosek_elektrike ?? 0);
       const strosekVode = Number(placilo.strosek_vode ?? 0);
       const najemnina = Number(placilo.najemnina ?? 0);
@@ -782,7 +771,9 @@ export default function AdminPogled() {
         stanje_vode_prej: o.prejsnje_stanje_vode == null ? null : Number(o.prejsnje_stanje_vode),
         stanje_vode: o.stanje_vode == null ? null : Number(o.stanje_vode),
         datum_vnosa: o.datum_vnosa ? dayjs(o.datum_vnosa).format('DD.MM.YYYY') : '-',
-        vnesel
+        vnesel,
+        je_zacetno_stanje: false,
+        se_lahko_brise: true
       };
     });
 
@@ -790,7 +781,6 @@ export default function AdminPogled() {
       (podatki.odcitki ?? []).map((o) => `${o.soba_id ?? ''}|${Number(o.mesec ?? 0)}|${Number(o.leto ?? 0)}`)
     );
 
-    // Za najemnike z začetnimi stanji ustvarimo virtualne vrstice, če za začetek še ni odčitka.
     const vrsticeZacetnihStanj = (podatki.uporabniki ?? [])
       .filter((u) => u?.soba_id && u?.uporabnik_od)
       .filter((u) => u?.zacetno_stanje_elektrike != null || u?.zacetno_stanje_vode != null)
@@ -830,7 +820,9 @@ export default function AdminPogled() {
             : (pretekli?.stanje_vode == null ? zacetnaVoda : Number(pretekli.stanje_vode)),
           stanje_vode: zacetnaVoda,
           datum_vnosa: datumZacetka.format('DD.MM.YYYY'),
-          vnesel: 'Začetno stanje najemnika'
+          vnesel: 'Začetno stanje najemnika',
+          je_zacetno_stanje: true,
+          se_lahko_brise: false
         };
       })
       .filter(Boolean);
@@ -933,27 +925,31 @@ export default function AdminPogled() {
     [podatki.sobe]
   );
 
-  const moznostiFilterUporabniki = useMemo(() => {
-    const poId = new Map();
-    vrsticeObracuni.forEach((vrstica) => {
-      if (vrstica.uporabnik_id && !poId.has(vrstica.uporabnik_id)) {
-        poId.set(vrstica.uporabnik_id, vrstica.uporabnik);
-      }
-    });
-    return Array.from(poId.entries())
-      .map(([id, ime]) => ({ id, ime }))
-      .sort((a, b) => a.ime.localeCompare(b.ime, 'sl'));
-  }, [vrsticeObracuni]);
+  const moznostiFilterUporabniki = useMemo(
+    () =>
+      (podatki.uporabniki ?? [])
+        .filter((u) => !u.admin)
+        .map((u) => ({
+          id: u.id,
+          ime: `${u.ime ?? ''} ${u.priimek ?? ''}`.trim() || u.email || u.id
+        }))
+        .sort((a, b) => a.ime.localeCompare(b.ime, 'sl')),
+    [podatki.uporabniki]
+  );
 
   const letaObracunov = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          vrsticeObracuni
+    () => {
+      const trenutnoLeto = dayjs().year();
+      return Array.from(
+        new Set([
+          trenutnoLeto,
+          trenutnoLeto - 1,
+          ...vrsticeObracuni
             .map((v) => Number(v.leto))
             .filter((l) => Number.isFinite(l) && l >= 2024)
-        )
-      ).sort((a, b) => b - a),
+        ])
+      ).sort((a, b) => b - a);
+    },
     [vrsticeObracuni]
   );
 
@@ -1027,7 +1023,7 @@ export default function AdminPogled() {
         },
         seja.user.id
       );
-      await nalozi({ prikaziNalaganje: false });
+      await nalozi({ prikaziNalaganje: false, vrziNapako: true });
       const jePosodobilSebe = Boolean(novUporabnik.id) && novUporabnik.id === seja.user.id;
       if (jePosodobilSebe) {
         await osveziProfil({ prikaziNalaganje: false });
@@ -1035,6 +1031,46 @@ export default function AdminPogled() {
       ponastaviUporabnikForm();
     } catch (err) {
       setNapaka(err.message || 'Uporabnika ni bilo mogoce shraniti.');
+    }
+  }
+
+  async function izbrisiUporabnika(ciljniUporabnik = null) {
+    setNapaka('');
+    setObvestilo('');
+
+    const uporabnikZaBrisanje = ciljniUporabnik ?? novUporabnik;
+    const uporabnikId = String(uporabnikZaBrisanje?.id ?? '').trim();
+
+    if (!uporabnikId) return;
+    if (uporabnikId === seja.user.id) {
+      setNapaka('Trenutno prijavljenega admin uporabnika ni mogoče izbrisati.');
+      return;
+    }
+
+    const ime =
+      uporabnikZaBrisanje?.ime_priimek ||
+      `${uporabnikZaBrisanje?.ime ?? ''} ${uporabnikZaBrisanje?.priimek ?? ''}`.trim() ||
+      uporabnikZaBrisanje?.email ||
+      uporabnikId;
+    const potrjeno = await odpriDialogBrisanja({
+      naslov: 'Izbriši uporabnika?',
+      sporocilo: `Ali res želiš izbrisati uporabnika (${ime})?`,
+      opomba: 'To dejanje odstrani uporabnika iz profila in prijave.'
+    });
+    if (!potrjeno) return;
+
+    try {
+      setObdelujemBrisanje(true);
+      await izbrisiUporabnikaZAuthStoritev(uporabnikId);
+      await nalozi({ prikaziNalaganje: false, vrziNapako: true });
+      if (novUporabnik.id === uporabnikId) {
+        ponastaviUporabnikForm();
+      }
+      setObvestilo('Uporabnik je uspešno izbrisan.');
+    } catch (err) {
+      setNapaka(err?.message || 'Uporabnika ni bilo mogoče izbrisati.');
+    } finally {
+      setObdelujemBrisanje(false);
     }
   }
 
@@ -1094,7 +1130,7 @@ export default function AdminPogled() {
       strosek_skupni: Number(shranjena.strosek_skupni ?? 0),
       nettv: Number(shranjena.nettv ?? shranjena.strosek_neta ?? 0),
       fiksni: Number(shranjena.fiksni ?? shranjena.strosek_tv ?? 0),
-      faktor_ogrevanja: normalizirajFaktorOgrevanja(shranjena.faktor_ogrevanja),
+      faktor_ogrevanja: normalizirajDelezOgrevanja(shranjena.faktor_ogrevanja),
       posodobil_ime: posodobilIme,
       posodobljeno_oblikovano: shranjena.posodobljeno_ob
         ? dayjs(shranjena.posodobljeno_ob).format('DD.MM.YYYY HH:mm')
@@ -1151,15 +1187,6 @@ export default function AdminPogled() {
     e.preventDefault();
     setNapaka('');
     try {
-      if (novaCena.id) {
-        const izbranaCena = vrsticeCene.find((c) => c.id === novaCena.id);
-        if (izbranaCena?.je_povezana_z_obracuni) {
-          throw new Error(
-            'Obračuni so povezani s to ceno, zato je ni več mogoče urejati ali brisati. Dodaj nov zapis z datumom "Velja od".'
-          );
-        }
-      }
-
       await dodajCeno({
         id: novaCena.id || undefined,
         tip_hise: novaCena.tip_hise,
@@ -1167,20 +1194,10 @@ export default function AdminPogled() {
         cena_elektrike: Number(novaCena.cena_elektrike),
         cena_vode: Number(novaCena.cena_vode)
       }, seja.user.id);
-      await nalozi();
+      await nalozi({ prikaziNalaganje: true, vrziNapako: true });
       ponastaviCenaForm();
     } catch (err) {
-      const sporocilo = String(err?.message ?? '');
-      if (
-        sporocilo.includes('Cene, uporabljene v potrjenih obračunih') ||
-        sporocilo.includes('Obračuni so povezani s to ceno')
-      ) {
-        setNapaka(
-          'Obračuni so povezani s to ceno, zato je ni več mogoče urejati ali brisati. Dodaj nov zapis z datumom "Velja od".'
-        );
-        return;
-      }
-      setNapaka(sporocilo || 'Cene ni bilo mogoče shraniti.');
+      setNapaka(String(err?.message ?? '') || 'Cene ni bilo mogoče shraniti.');
     }
   }
 
@@ -1189,37 +1206,69 @@ export default function AdminPogled() {
     setObvestilo('');
 
     if (!vrstica?.id) return;
-    if (vrstica.je_povezana_z_obracuni) {
-      setNapaka(
-        'Obračuni so povezani s to ceno, zato je ni več mogoče urejati ali brisati. Dodaj nov zapis z datumom "Velja od".'
-      );
-      return;
-    }
 
-    const potrjeno = window.confirm(
-      `Izbrišem ceno (${vrstica.tip_hise}, velja od ${vrstica.velja_od})?`
-    );
+    const potrjeno = await odpriDialogBrisanja({
+      naslov: 'Izbriši ceno?',
+      sporocilo: `Ali res želiš izbrisati ceno (${vrstica.tip_hise}, velja od ${vrstica.velja_od})?`
+    });
     if (!potrjeno) return;
 
     try {
+      setObdelujemBrisanje(true);
       await izbrisiCenoStoritev(vrstica.id);
-      await nalozi();
+      await nalozi({ prikaziNalaganje: true, vrziNapako: true });
       if (novaCena.id === vrstica.id) {
         ponastaviCenaForm();
       }
       setObvestilo('Cena je uspešno izbrisana.');
     } catch (err) {
-      const sporocilo = String(err?.message ?? '');
-      if (
-        sporocilo.includes('Cene, uporabljene v potrjenih obračunih') ||
-        sporocilo.includes('Obračuni so povezani s to ceno')
-      ) {
-        setNapaka(
-          'Obračuni so povezani s to ceno, zato je ni več mogoče urejati ali brisati. Dodaj nov zapis z datumom "Velja od".'
-        );
-        return;
-      }
-      setNapaka(sporocilo || 'Cene ni bilo mogoče izbrisati.');
+      setNapaka(String(err?.message ?? '') || 'Cene ni bilo mogoče izbrisati.');
+    } finally {
+      setObdelujemBrisanje(false);
+    }
+  }
+
+  async function izbrisiObracunVrstico(vrstica) {
+    setNapaka('');
+    setObvestilo('');
+
+    if (!vrstica?.placilo_id) {
+      setNapaka('Obračun ni določen.');
+      return;
+    }
+    if (vrstica.placano) {
+      setNapaka('Potrjenega obračuna ni mogoče izbrisati. Najprej ga nastavi na odprto stanje.');
+      return;
+    }
+
+    const opisObracuna = `${vrstica.soba ?? '-'} · ${vrstica.uporabnik ?? '-'} · ${vrstica.obdobje ?? '-'}`;
+    const potrjeno = await odpriDialogBrisanja({
+      naslov: 'Izbriši obračun?',
+      sporocilo: `Ali res želiš izbrisati obračun (${opisObracuna})?`,
+      opomba: 'Obračun bo odstranjen iz trenutne tabele obračunov.'
+    });
+    if (!potrjeno) return;
+
+    try {
+      setObdelujemBrisanje(true);
+      await izbrisiObracunStoritev({
+        placilo_id: vrstica.placilo_id,
+        odcitek_id: vrstica.odcitek_id ?? null
+      });
+
+      setPodatki((prej) => ({
+        ...prej,
+        placila: prej.placila.filter((p) => p.id !== vrstica.placilo_id),
+        odcitki: vrstica.odcitek_id
+          ? prej.odcitki.filter((o) => o.id !== vrstica.odcitek_id)
+          : prej.odcitki
+      }));
+
+      setObvestilo('Obračun je uspešno izbrisan.');
+    } catch (err) {
+      setNapaka(err?.message || 'Obračuna ni bilo mogoče izbrisati.');
+    } finally {
+      setObdelujemBrisanje(false);
     }
   }
 
@@ -1242,6 +1291,37 @@ export default function AdminPogled() {
       ponastaviOgrevanjeForm();
     } catch (err) {
       setNapaka(err.message || 'Ogrevanja po tipu ni bilo mogoce shraniti.');
+    }
+  }
+
+  async function izbrisiOgrevanjeVrstico(vrstica) {
+    setNapaka('');
+    setObvestilo('');
+
+    if (!vrstica?.id) return;
+
+    const opis = `${vrstica.tip_hise}, ${String(Number(vrstica.mesec) || 1).padStart(2, '0')}.${vrstica.leto}`;
+    const potrjeno = await odpriDialogBrisanja({
+      naslov: 'Izbriši ogrevanje?',
+      sporocilo: `Ali res želiš izbrisati ogrevanje (${opis})?`
+    });
+    if (!potrjeno) return;
+
+    try {
+      setObdelujemBrisanje(true);
+      await izbrisiOgrevanjeTipStoritev(vrstica.id);
+      setPodatki((prej) => ({
+        ...prej,
+        ogrevanjeTipi: prej.ogrevanjeTipi.filter((o) => o.id !== vrstica.id)
+      }));
+      if (novoOgrevanje.id === vrstica.id) {
+        ponastaviOgrevanjeForm();
+      }
+      setObvestilo('Ogrevanje je uspešno izbrisano.');
+    } catch (err) {
+      setNapaka(err?.message || 'Ogrevanja ni bilo mogoče izbrisati.');
+    } finally {
+      setObdelujemBrisanje(false);
     }
   }
 
@@ -1280,7 +1360,14 @@ export default function AdminPogled() {
           soba_id: novStevecAdmin.soba_id,
           mesec: Number(novStevecAdmin.mesec),
           leto: Number(novStevecAdmin.leto),
+          prejsnje_stanje_elektrike:
+            novStevecAdmin.prejsnje_stanje_elektrike === ''
+              ? null
+              : Number(novStevecAdmin.prejsnje_stanje_elektrike),
           stanje_elektrike: Number(novStevecAdmin.stanje_elektrike),
+          prejsnje_stanje_vode: sobaImaVodniStevec(izbranaSobaStevec)
+            ? (novStevecAdmin.prejsnje_stanje_vode === '' ? null : Number(novStevecAdmin.prejsnje_stanje_vode))
+            : null,
           stanje_vode: sobaImaVodniStevec(izbranaSobaStevec)
             ? (novStevecAdmin.stanje_vode === '' ? null : Number(novStevecAdmin.stanje_vode))
             : null
@@ -1293,6 +1380,35 @@ export default function AdminPogled() {
       ponastaviStevecAdminForm();
     } catch (err) {
       setNapaka(err.message || 'Števca ni bilo mogoče shraniti.');
+    }
+  }
+
+  async function izbrisiStevecAdminVrstico(vrstica) {
+    setNapaka('');
+    setObvestilo('');
+
+    if (!vrstica?.id || vrstica.je_zacetno_stanje) return;
+
+    const opisOdcitka = `${vrstica.soba ?? '-'} · ${vrstica.obdobje ?? '-'}`;
+    const potrjeno = await odpriDialogBrisanja({
+      naslov: 'Izbriši odčitek?',
+      sporocilo: `Ali res želiš izbrisati odčitek (${opisOdcitka})?`,
+      opomba: 'Začetna stanja najema ostanejo prikazana.'
+    });
+    if (!potrjeno) return;
+
+    try {
+      setObdelujemBrisanje(true);
+      await izbrisiAdminOdcitekSobeStoritev(vrstica.id);
+      await nalozi({ prikaziNalaganje: false, vrziNapako: true });
+      if (novStevecAdmin.id === vrstica.id) {
+        ponastaviStevecAdminForm();
+      }
+      setObvestilo('Odčitek je uspešno izbrisan. Če za ta začetek najema obstaja začetno stanje, bo v tabeli prikazana začetna vrstica.');
+    } catch (err) {
+      setNapaka(err?.message || 'Odčitka ni bilo mogoče izbrisati.');
+    } finally {
+      setObdelujemBrisanje(false);
     }
   }
 
@@ -1312,25 +1428,19 @@ export default function AdminPogled() {
         },
         seja.user.id
       );
+      const tipiHise = [...(pregled.tipiHise ?? [])].sort((a, b) => a.localeCompare(b, 'sl'));
+      const manjkajociTipi = pregled.manjkajociTipi ?? [];
 
-      if ((pregled.manjkajociTipi ?? []).length > 0) {
-        setDialogManjkajoceOgrevanje({
-          odprt: true,
-          mesec: obdobje.mesec,
-          leto: obdobje.leto,
-          nazivObdobja,
-          tipi: pregled.manjkajociTipi,
-          vrednosti: Object.fromEntries(pregled.manjkajociTipi.map((t) => [t, '']))
-        });
-        return;
-      }
-
-      await osveziSobeOgrevanjePoObdobju(
-        { mesec: obdobje.mesec, leto: obdobje.leto },
-        seja.user.id
-      );
-      await nalozi();
-      setDialogZePripravljeno({ odprt: true, nazivObdobja });
+      setDialogManjkajoceOgrevanje({
+        odprt: true,
+        mesec: obdobje.mesec,
+        leto: obdobje.leto,
+        nazivObdobja,
+        tipiHise,
+        manjkajociTipi,
+        potrdiTipi: [...manjkajociTipi],
+        vrednosti: Object.fromEntries(manjkajociTipi.map((tip) => [tip, '']))
+      });
     } catch (err) {
       setNapaka(err.message || 'Potrditev obračunskega obdobja ni uspela.');
     } finally {
@@ -1344,7 +1454,9 @@ export default function AdminPogled() {
       mesec: null,
       leto: null,
       nazivObdobja: '',
-      tipi: [],
+      tipiHise: [],
+      manjkajociTipi: [],
+      potrdiTipi: [],
       vrednosti: {}
     });
   }
@@ -1357,6 +1469,14 @@ export default function AdminPogled() {
     setPotrjevanjeObdobja(true);
 
     try {
+      const manjkajociTipi = dialogManjkajoceOgrevanje.manjkajociTipi ?? [];
+      const tipiZaPotrditev = (dialogManjkajoceOgrevanje.potrdiTipi ?? []).filter((tip) =>
+        manjkajociTipi.includes(tip)
+      );
+      if (manjkajociTipi.length > 0 && tipiZaPotrditev.length === 0) {
+        throw new Error('Izberi vsaj en tip hiše, za katerega želiš potrditi ogrevanje.');
+      }
+
       const zneski = Object.fromEntries(
         Object.entries(dialogManjkajoceOgrevanje.vrednosti).map(([tip, v]) => [tip, Number(v) || 0])
       );
@@ -1365,7 +1485,8 @@ export default function AdminPogled() {
           mesec: dialogManjkajoceOgrevanje.mesec,
           leto: dialogManjkajoceOgrevanje.leto,
           nastaviManjkajoceNaNulo: true,
-          zneski
+          zneski,
+          tipiZaPotrditev
         },
         seja.user.id
       );
@@ -1377,32 +1498,60 @@ export default function AdminPogled() {
         },
         seja.user.id
       );
-      await nalozi();
-      const vnosZneskiOpis = Object.entries(zneski).map(([t, z]) => `${t}: ${z.toFixed(2)} €`).join(', ');
-      setObvestilo(
-        `Obračunsko obdobje ${dialogManjkajoceOgrevanje.nazivObdobja} je potrjeno. Ogrevanje nastavljeno: ${vnosZneskiOpis}.`
+      const pregledPoShranjevanju = await pripraviPrejsnjeObracunskoObdobje(
+        {
+          mesec: dialogManjkajoceOgrevanje.mesec,
+          leto: dialogManjkajoceOgrevanje.leto,
+          nastaviManjkajoceNaNulo: false
+        },
+        seja.user.id
       );
+      await nalozi();
+
+      const preostaliManjkajoci = pregledPoShranjevanju.manjkajociTipi ?? [];
+      const tipiHise = [...(pregledPoShranjevanju.tipiHise ?? [])].sort((a, b) => a.localeCompare(b, 'sl'));
+      if (preostaliManjkajoci.length === 0) {
+        // Obdržimo isto modalno okno odprto in prikažemo oba tipa hiš kot že potrjena.
+        setDialogManjkajoceOgrevanje({
+          odprt: true,
+          mesec: dialogManjkajoceOgrevanje.mesec,
+          leto: dialogManjkajoceOgrevanje.leto,
+          nazivObdobja: dialogManjkajoceOgrevanje.nazivObdobja,
+          tipiHise,
+          manjkajociTipi: [],
+          potrdiTipi: [],
+          vrednosti: {}
+        });
+        setObvestilo(`Podatki za obračune za obdobje ${dialogManjkajoceOgrevanje.nazivObdobja} so pripravljeni.`);
+      } else {
+        setDialogManjkajoceOgrevanje({
+          odprt: true,
+          mesec: dialogManjkajoceOgrevanje.mesec,
+          leto: dialogManjkajoceOgrevanje.leto,
+          nazivObdobja: dialogManjkajoceOgrevanje.nazivObdobja,
+          tipiHise,
+          manjkajociTipi: preostaliManjkajoci,
+          potrdiTipi: [...preostaliManjkajoci],
+          vrednosti: Object.fromEntries(preostaliManjkajoci.map((tip) => [tip, '']))
+        });
+        setObvestilo(
+          `Za obdobje ${dialogManjkajoceOgrevanje.nazivObdobja} še manjkajo podatki ogrevanja za: ${preostaliManjkajoci.join(', ')}.`
+        );
+      }
     } catch (err) {
       setNapaka(err.message || 'Nastavitev manjkajočega ogrevanja ni uspela.');
     } finally {
-      zapriDialogManjkajoceOgrevanje();
       setPotrjevanjeObdobja(false);
     }
   }
 
   function jeCelicaObracunUredljiva(params) {
-    if (!params?.row?.odcitek_id) {
-      return false;
-    }
-    if (params?.row?.placano) {
-      return false;
-    }
+    const imaOdcitek = Boolean(params?.row?.odcitek_id);
+    if (params.field === 'stanje_elektrike') return imaOdcitek;
     if (params.field === 'stanje_vode') {
-      return Boolean(params?.row?.voda_stanje);
+      return imaOdcitek && Boolean(params?.row?.voda_stanje);
     }
     return [
-      'stanje_elektrike',
-      'stanje_vode',
       'najemnina',
       'strosek_skupni',
       'strosek_neta',
@@ -1415,28 +1564,28 @@ export default function AdminPogled() {
 
   async function obdelajPosodobitevObracuna(novaVrstica, staraVrstica) {
     setNapaka('');
-    if (staraVrstica?.placano) {
-      throw new Error('Obračun je potrjen. Za to obdobje odčitkov in stroškov ni več dovoljeno spreminjati.');
-    }
-    if (!novaVrstica.odcitek_id) {
-      throw new Error('Za ta obračun manjka zapis odčitka. Najprej vnesi števec.');
+    const imaOdcitek = Boolean(novaVrstica.odcitek_id);
+
+    const stanjeElektrike = imaOdcitek
+      ? Number(novaVrstica.stanje_elektrike)
+      : Number(staraVrstica.stanje_elektrike ?? 0);
+    if (imaOdcitek) {
+      if (!Number.isFinite(stanjeElektrike) || stanjeElektrike < 0) {
+        throw new Error('Stanje elektrike mora biti 0 ali več.');
+      }
+      if (stanjeElektrike < Number(novaVrstica.stanje_elektrike_prej ?? 0)) {
+        throw new Error('Novo stanje elektrike ne sme biti manjše od prejšnjega.');
+      }
     }
 
-    const stanjeElektrike = Number(novaVrstica.stanje_elektrike);
-    if (!Number.isFinite(stanjeElektrike) || stanjeElektrike < 0) {
-      throw new Error('Stanje elektrike mora biti 0 ali več.');
-    }
-    if (stanjeElektrike < Number(novaVrstica.stanje_elektrike_prej ?? 0)) {
-      throw new Error('Novo stanje elektrike ne sme biti manjše od prejšnjega.');
-    }
+    const stanjeVode = (() => {
+      if (!novaVrstica.voda_stanje) return null;
+      const surovaVrednost = imaOdcitek ? novaVrstica.stanje_vode : staraVrstica.stanje_vode;
+      if (surovaVrednost == null || surovaVrednost === '') return null;
+      return Number(surovaVrednost);
+    })();
 
-    const stanjeVode = novaVrstica.voda_stanje
-      ? (novaVrstica.stanje_vode == null || novaVrstica.stanje_vode === ''
-          ? null
-          : Number(novaVrstica.stanje_vode))
-      : null;
-
-    if (novaVrstica.voda_stanje) {
+    if (imaOdcitek && novaVrstica.voda_stanje) {
       if (!Number.isFinite(stanjeVode) || stanjeVode < 0) {
         throw new Error('Stanje vode mora biti 0 ali več.');
       }
@@ -1544,7 +1693,11 @@ export default function AdminPogled() {
 
     const rezultat = await shraniAdminObracun(
       {
-        id: novaVrstica.odcitek_id,
+        id: novaVrstica.odcitek_id ?? null,
+        soba_id: novaVrstica.soba_id,
+        uporabnik_id: novaVrstica.uporabnik_id,
+        mesec: novaVrstica.mesec,
+        leto: novaVrstica.leto,
         stanje_elektrike: stanjeElektrike,
         stanje_vode: stanjeVode,
         placano,
@@ -1567,7 +1720,9 @@ export default function AdminPogled() {
     );
 
     setPodatki((prej) => {
-      const odcitki = prej.odcitki.map((o) => (o.id === rezultat.odcitek.id ? rezultat.odcitek : o));
+      const odcitki = rezultat?.odcitek
+        ? prej.odcitki.map((o) => (o.id === rezultat.odcitek.id ? rezultat.odcitek : o))
+        : prej.odcitki;
       const placilo = rezultat.placilo;
       let placila = prej.placila;
 
@@ -1606,6 +1761,99 @@ export default function AdminPogled() {
       datum_placila_iso: datumPlacilaIso,
       datum_placila_format: datumPlacilaIso ? dayjs(datumPlacilaIso).format('DD.MM.YYYY') : '-'
     };
+  }
+
+  async function dodajRocniObracun(vnos) {
+    setNapaka('');
+    setObvestilo('');
+
+    const sobaId = String(vnos?.soba_id ?? '').trim();
+    const uporabnikId = String(vnos?.uporabnik_id ?? '').trim();
+    const mesec = Number(vnos?.mesec);
+    const leto = Number(vnos?.leto);
+
+    if (
+      !sobaId ||
+      !uporabnikId ||
+      !Number.isFinite(mesec) ||
+      mesec < 1 ||
+      mesec > 12 ||
+      !Number.isFinite(leto) ||
+      leto < 2024
+    ) {
+      const sporocilo = 'Soba, najemnik, mesec in leto so obvezni.';
+      setNapaka(sporocilo);
+      throw new Error(sporocilo);
+    }
+
+    const najemnik = (podatki.uporabniki ?? []).find((u) => u.id === uporabnikId) ?? null;
+    if (!najemnik || najemnik.admin) {
+      const sporocilo = 'Za ročni obračun izberi veljavnega najemnika.';
+      setNapaka(sporocilo);
+      throw new Error(sporocilo);
+    }
+
+    const parsePozitivno = (vrednost, imePolja) => {
+      const parsed = Number(vrednost ?? 0);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        throw new Error(`${imePolja} mora biti 0 ali več.`);
+      }
+      return parsed;
+    };
+
+    try {
+      const najemnina = parsePozitivno(vnos?.najemnina, 'Najemnina');
+      const strosekSkupni = parsePozitivno(vnos?.strosek_skupni, 'Skupni strošek');
+      const strosekNeta = parsePozitivno(vnos?.strosek_neta, 'NetTV');
+      const strosekTv = parsePozitivno(vnos?.strosek_tv, 'Fiksni strošek');
+      const strosekOgrevanja = parsePozitivno(vnos?.strosek_ogrevanja, 'Ogrevanje');
+      const strosekElektrike = parsePozitivno(vnos?.strosek_elektrike, 'Strošek elektrike');
+      const strosekVode = parsePozitivno(vnos?.strosek_vode, 'Strošek vode');
+      const cenaElektrike = parsePozitivno(vnos?.cena_elektrike, 'Cena elektrike');
+      const cenaVode = parsePozitivno(vnos?.cena_vode, 'Cena vode');
+
+      const skupniStrosek = Number(
+        (
+          najemnina +
+          strosekSkupni +
+          strosekNeta +
+          strosekTv +
+          strosekOgrevanja +
+          strosekElektrike +
+          strosekVode
+        ).toFixed(2)
+      );
+
+      await shraniAdminObracun(
+        {
+          soba_id: sobaId,
+          uporabnik_id: uporabnikId,
+          mesec,
+          leto,
+          placano: false,
+          datum_placila: null,
+          cena_elektrike: cenaElektrike,
+          cena_vode: cenaVode,
+          stroski: {
+            najemnina,
+            strosek_skupni: strosekSkupni,
+            strosek_elektrike: strosekElektrike,
+            strosek_vode: strosekVode,
+            strosek_ogrevanja: strosekOgrevanja,
+            strosek_neta: strosekNeta,
+            strosek_tv: strosekTv,
+            skupni_strosek: skupniStrosek
+          }
+        },
+        seja.user.id
+      );
+      await nalozi({ prikaziNalaganje: false, vrziNapako: true });
+      setObvestilo('Ročni obračun je uspešno dodan.');
+    } catch (err) {
+      const sporocilo = err?.message || 'Ročnega obračuna ni bilo mogoče dodati.';
+      setNapaka(sporocilo);
+      throw new Error(sporocilo);
+    }
   }
 
   function obdelajNapakoPosodobitveObracuna(err) {
@@ -1711,7 +1959,7 @@ export default function AdminPogled() {
       net_tv: Number(s.nettv ?? s.strosek_neta ?? 0),
       fiksni: Number(s.fiksni ?? s.strosek_tv ?? 0),
       ogrevanje: Number(razdelitveOgrevanjaPoTipu.get(s.tip_hise)?.get(s.id) ?? s.strosek_ogrevanja ?? 0),
-      faktor_ogrevanja: normalizirajFaktorOgrevanja(s.faktor_ogrevanja),
+      faktor_ogrevanja: normalizirajDelezOgrevanja(s.faktor_ogrevanja),
       posodobil: s.posodobil ? (uporabnikiPoId.get(s.posodobil) ?? s.posodobil) : '',
       posodobljeno: s.posodobljeno_ob ? dayjs(s.posodobljeno_ob).format('DD.MM.YYYY HH:mm') : ''
     }));
@@ -1729,7 +1977,7 @@ export default function AdminPogled() {
         { key: 'net_tv', label: 'NetTV' },
         { key: 'fiksni', label: 'Fiksni' },
         { key: 'ogrevanje', label: 'Ogrevanje' },
-        { key: 'faktor_ogrevanja', label: 'Faktor ogrevanja' },
+        { key: 'faktor_ogrevanja', label: 'Delež ogrevanja' },
         { key: 'posodobil', label: 'Posodobil' },
         { key: 'posodobljeno', label: 'Posodobljeno ob' }
       ],
@@ -1919,6 +2167,7 @@ export default function AdminPogled() {
     { id: 2, label: 'Cene & Števci', ikona: <ElectricBoltOutlinedIcon /> },
     { id: 3, label: 'Ogrevanje', ikona: <WhatshotOutlinedIcon /> },
     { id: 4, label: 'Obračuni', ikona: <ReceiptLongOutlinedIcon /> },
+    { id: 5, label: 'Obvestila', ikona: <CampaignOutlinedIcon /> },
   ];
 
   // Ime prijavljenega admina za glavo stranskega menija
@@ -1974,6 +2223,8 @@ export default function AdminPogled() {
           stolpciUporabniki={stolpciUporabniki}
           izberiUporabnikaZaUrejanje={izberiUporabnikaZaUrejanje}
           nastaviAktivnostUporabnika={nastaviAktivnostUporabnika}
+          izbrisiUporabnika={izbrisiUporabnika}
+          prijavljenUporabnikId={seja.user.id}
           predlogZacetnihStanjZaNovUporabnik={predlogZacetnihStanjZaNovUporabnik}
           uporabiPredlaganaZacetnaStanja={uporabiPredlaganaZacetnaStanja}
           sobaImaVodniStevecZaNovUporabnik={sobaImaVodniStevec(izbranaSobaNovUporabnik)}
@@ -2019,6 +2270,7 @@ export default function AdminPogled() {
           izberiCenoZaUrejanje={izberiCenoZaUrejanje}
           shraniCeno={shraniCeno}
           izbrisiCenoVrstico={izbrisiCenoVrstico}
+          izbrisiStevecAdminVrstico={izbrisiStevecAdminVrstico}
           ponastaviCenaForm={ponastaviCenaForm}
           novaCena={novaCena}
           setNovaCena={setNovaCena}
@@ -2048,6 +2300,7 @@ export default function AdminPogled() {
           lokalizacijaMreze={lokalizacijaMreze}
           izberiOgrevanjeZaUrejanje={izberiOgrevanjeZaUrejanje}
           shraniOgrevanjePoTipu={shraniOgrevanjePoTipu}
+          izbrisiOgrevanjeVrstico={izbrisiOgrevanjeVrstico}
           ponastaviOgrevanjeForm={ponastaviOgrevanjeForm}
           novoOgrevanje={novoOgrevanje}
           setNovoOgrevanje={setNovoOgrevanje}
@@ -2060,11 +2313,14 @@ export default function AdminPogled() {
         <ObracuniSekcija
           vrsticeObracuniFiltrirane={vrsticeObracuniFiltrirane}
           odpreDialogPotrdiVse={odpreDialogPotrdiVse}
+          dodajRocniObracun={dodajRocniObracun}
           izvoziObracuneXlsx={izvoziObracuneXlsx}
           filterObracuni={filterObracuni}
           setFilterObracuni={setFilterObracuni}
           moznostiFilterSobe={moznostiFilterSobe}
           moznostiFilterUporabniki={moznostiFilterUporabniki}
+          podatkiSobe={podatki.sobe}
+          podatkiUporabniki={podatki.uporabniki}
           imenaMesecov={imenaMesecov}
           letaObracunov={letaObracunov}
           stolpciObracuni={stolpciObracuni}
@@ -2073,12 +2329,18 @@ export default function AdminPogled() {
           obdelajPosodobitevObracuna={obdelajPosodobitevObracuna}
           obdelajNapakoPosodobitveObracuna={obdelajNapakoPosodobitveObracuna}
           jeCelicaObracunUredljiva={jeCelicaObracunUredljiva}
+          izbrisiObracunVrstico={izbrisiObracunVrstico}
+        />
+      )}
+
+      {tab === 5 && (
+        <ObvestilaSekcija
+          podatkiSobe={podatki.sobe}
+          ustvarilId={seja?.user?.id}
         />
       )}
 
       <AdminDialogi
-        dialogZePripravljeno={dialogZePripravljeno}
-        setDialogZePripravljeno={setDialogZePripravljeno}
         dialogPotrdiVse={dialogPotrdiVse}
         setDialogPotrdiVse={setDialogPotrdiVse}
         obdelujemPotrdiVse={obdelujemPotrdiVse}
@@ -2088,6 +2350,17 @@ export default function AdminPogled() {
         potrjevanjeObdobja={potrjevanjeObdobja}
         zapriDialogManjkajoceOgrevanje={zapriDialogManjkajoceOgrevanje}
         potrdiNastavitevManjkajocegaOgrevanjaNaNulo={potrdiNastavitevManjkajocegaOgrevanjaNaNulo}
+      />
+
+      <PotrditveniDialog
+        odprt={dialogBrisanje.odprt}
+        naslov={dialogBrisanje.naslov}
+        sporocilo={dialogBrisanje.sporocilo}
+        opomba={dialogBrisanje.opomba}
+        oznakaPotrditve="Izbriši"
+        potrjujem={obdelujemBrisanje}
+        onZapri={() => zapriDialogBrisanja(false)}
+        onPotrdi={() => zapriDialogBrisanja(true)}
       />
     </AppLayout>
   );

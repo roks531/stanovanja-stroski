@@ -59,6 +59,7 @@ export default function CeneStevciSekcija({
   izberiCenoZaUrejanje,
   shraniCeno,
   izbrisiCenoVrstico,
+  izbrisiStevecAdminVrstico,
   ponastaviCenaForm,
   novaCena,
   setNovaCena,
@@ -78,9 +79,6 @@ export default function CeneStevciSekcija({
   imenaMesecov
 }) {
   const stolpciCeneZBrisanjem = useMemo(() => {
-    const indeksVoda = stolpciCene.findIndex((stolpec) => stolpec.field === 'cena_vode');
-    if (indeksVoda < 0) return stolpciCene;
-
     const stolpecBrisanje = {
       field: 'akcije_cena',
       headerName: '',
@@ -91,12 +89,8 @@ export default function CeneStevciSekcija({
       align: 'center',
       headerAlign: 'center',
       renderCell: (params) => {
-        if (!params.row.se_lahko_brise) {
-          return null;
-        }
-
         return (
-          <Tooltip title="Izbriši ceno (ni del obračunov)">
+          <Tooltip title="Izbriši ceno">
             <span>
               <IconButton
                 size="small"
@@ -115,12 +109,48 @@ export default function CeneStevciSekcija({
       }
     };
 
-    return [
-      ...stolpciCene.slice(0, indeksVoda + 1),
-      stolpecBrisanje,
-      ...stolpciCene.slice(indeksVoda + 1)
-    ];
+    const stolpciBrezAkcij = stolpciCene.filter((stolpec) => stolpec.field !== 'akcije_cena');
+    return [...stolpciBrezAkcij, stolpecBrisanje];
   }, [stolpciCene, izbrisiCenoVrstico]);
+
+  const stolpciStevciZBrisanjem = useMemo(() => {
+    const stolpecBrisanje = {
+      field: 'akcije_stevec',
+      headerName: '',
+      width: 56,
+      sortable: false,
+      filterable: false,
+      disableColumnMenu: true,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => {
+        if (params.row.je_zacetno_stanje) {
+          return null;
+        }
+
+        return (
+          <Tooltip title="Izbriši odčitek">
+            <span>
+              <IconButton
+                size="small"
+                color="error"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  izbrisiStevecAdminVrstico?.(params.row);
+                }}
+                aria-label="Izbriši odčitek"
+              >
+                <DeleteOutlineOutlinedIcon sx={{ fontSize: 17 }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        );
+      }
+    };
+
+    const stolpciBrezAkcij = stolpciAdminStevci.filter((stolpec) => stolpec.field !== 'akcije_stevec');
+    return [...stolpciBrezAkcij, stolpecBrisanje];
+  }, [stolpciAdminStevci, izbrisiStevecAdminVrstico]);
 
   return (
     <Card className="kartica-jeklo" sx={ADMIN_SEKCIJA_CARD_SX}>
@@ -139,8 +169,8 @@ export default function CeneStevciSekcija({
                 <Chip size="small" color="primary" label={`${vrsticeCene.length} zapisov`} />
               </Stack>
               <Typography variant="body2" color="text.secondary" mt={0.25}>
-                Cene elektrike in vode ter vnos odčitkov po sobah. Zapise, ki niso vezani na obračun,
-                lahko izbrišeš z ikono koša v tabeli cen.
+                Cene elektrike in vode ter vnos odčitkov po sobah. Zapise lahko izbrišeš z ikono koša
+                na desni strani tabele.
               </Typography>
             </Box>
             <Button
@@ -225,7 +255,7 @@ export default function CeneStevciSekcija({
                       />
                       <Typography variant="caption" color="text.secondary">
                         {novaCena.id
-                          ? 'Če je cena del potrjenega obračuna, sprememba ne bo dovoljena.'
+                          ? 'Urejanje trenutnega zapisa.'
                           : 'Klik na vrstico odpre urejanje izbranega zapisa.'}
                       </Typography>
                     </Box>
@@ -289,14 +319,14 @@ export default function CeneStevciSekcija({
           )}
 
           {ceneStevciPodtab === 1 && (
-            <Stack spacing={1.5} sx={{ flex: 1, minHeight: 0 }}>
+            <Stack spacing={1.5}>
               <Box sx={KOMPAKTEN_SLOG_POLJ}>
                 <Typography variant="subtitle1" fontWeight={700}>Vnos števcev po sobah</Typography>
                 <Typography variant="body2" color="text.secondary">
                   Admin lahko vnese ali popravi stanje elektrike in vode za katerokoli sobo.
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Obdobja s potrjenim obračunom so zaklenjena in jih ni več mogoče spreminjati.
+                  Vrednosti števcev lahko urejaš ali brišeš neodvisno od že potrjenih obračunov.
                 </Typography>
                 <Box sx={{ mt: 1 }}>
                   <SearchableSelect
@@ -334,7 +364,7 @@ export default function CeneStevciSekcija({
                     <DataGrid
                       sx={ADMIN_DATAGRID_FLEKS_SX}
                       rows={vrsticeStevciAdminFiltrirane}
-                      columns={stolpciAdminStevci}
+                      columns={stolpciStevciZBrisanjem}
                       density="compact"
                       rowHeight={66}
                       disableRowSelectionOnClick
@@ -364,8 +394,8 @@ export default function CeneStevciSekcija({
                   >
                     <Stack component="form" spacing={1} onSubmit={shraniStevecAdmin} sx={KOMPAKTEN_SLOG_POLJ}>
                       <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
-                        <Typography variant="subtitle2" color="text.secondary">Uredi števec</Typography>
-                        <Button variant="outlined" size="small" onClick={ponastaviStevecAdminForm}>Nov števec</Button>
+                        <Typography variant="subtitle2" color="text.secondary">Uredi odčitek</Typography>
+                        <Button variant="outlined" size="small" onClick={ponastaviStevecAdminForm}>Nov odčitek</Button>
                       </Stack>
                       <Chip
                         size="small"
@@ -381,6 +411,7 @@ export default function CeneStevciSekcija({
                           setNovStevecAdmin((prej) => ({
                             ...prej,
                             soba_id: novaVrednost,
+                            prejsnje_stanje_vode: sobaImaVodniStevec(soba) ? prej.prejsnje_stanje_vode : '',
                             stanje_vode: sobaImaVodniStevec(soba) ? prej.stanje_vode : ''
                           }));
                         }}
@@ -413,32 +444,57 @@ export default function CeneStevciSekcija({
                         />
                       </Box>
 
-                      <TextField
-                        label="Stanje elektrike"
-                        type="number"
-                        value={novStevecAdmin.stanje_elektrike}
-                        onChange={(e) =>
-                          setNovStevecAdmin((prej) => ({ ...prej, stanje_elektrike: e.target.value }))
-                        }
-                        size="small"
-                        required
-                        fullWidth
-                      />
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                        <TextField
+                          label="E prejšnje"
+                          type="number"
+                          value={novStevecAdmin.prejsnje_stanje_elektrike}
+                          onChange={(e) =>
+                            setNovStevecAdmin((prej) => ({ ...prej, prejsnje_stanje_elektrike: e.target.value }))
+                          }
+                          size="small"
+                          fullWidth
+                        />
+                        <TextField
+                          label="E novo"
+                          type="number"
+                          value={novStevecAdmin.stanje_elektrike}
+                          onChange={(e) =>
+                            setNovStevecAdmin((prej) => ({ ...prej, stanje_elektrike: e.target.value }))
+                          }
+                          size="small"
+                          required
+                          fullWidth
+                        />
+                      </Box>
 
-                      <TextField
-                        label="Stanje vode"
-                        type="number"
-                        value={novStevecAdmin.stanje_vode}
-                        onChange={(e) =>
-                          setNovStevecAdmin((prej) => ({ ...prej, stanje_vode: e.target.value }))
-                        }
-                        size="small"
-                        fullWidth
-                        disabled={!sobaImaVodniStevec(izbranaSobaStevec)}
-                        helperText={!sobaImaVodniStevec(izbranaSobaStevec) ? 'Ta soba nima števca za vodo.' : ''}
-                      />
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                        <TextField
+                          label="V prejšnje"
+                          type="number"
+                          value={novStevecAdmin.prejsnje_stanje_vode}
+                          onChange={(e) =>
+                            setNovStevecAdmin((prej) => ({ ...prej, prejsnje_stanje_vode: e.target.value }))
+                          }
+                          size="small"
+                          fullWidth
+                          disabled={!sobaImaVodniStevec(izbranaSobaStevec)}
+                        />
+                        <TextField
+                          label="V novo"
+                          type="number"
+                          value={novStevecAdmin.stanje_vode}
+                          onChange={(e) =>
+                            setNovStevecAdmin((prej) => ({ ...prej, stanje_vode: e.target.value }))
+                          }
+                          size="small"
+                          fullWidth
+                          disabled={!sobaImaVodniStevec(izbranaSobaStevec)}
+                          helperText={!sobaImaVodniStevec(izbranaSobaStevec) ? 'Ta soba nima števca za vodo.' : ''}
+                        />
+                      </Box>
 
-                      <Button type="submit" variant="contained" className="gumb-jeklo">Shrani števec</Button>
+                      <Button type="submit" variant="contained" className="gumb-jeklo">Shrani odčitek</Button>
                     </Stack>
                   </Box>
                 </Grid>

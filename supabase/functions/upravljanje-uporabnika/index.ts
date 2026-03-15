@@ -2,10 +2,11 @@ import { createClient } from 'npm:@supabase/supabase-js@2.90.1';
 
 type Vhod = {
   id?: string;
-  ime: string;
-  priimek: string;
+  izbrisi?: boolean;
+  ime?: string;
+  priimek?: string;
   telefon?: string | null;
-  email: string;
+  email?: string;
   geslo?: string;
   soba_id?: string | null;
   zacetno_stanje_elektrike?: number | string | null;
@@ -24,7 +25,7 @@ const PRIVZETI_DOVOLJENI_ORIGINI = [
   'http://localhost:5174',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
-  'https://stanovanja-stroski.pages.dev'
+  'https://sobe-dovc.pages.dev'
 ];
 
 type CorsNastavitve = {
@@ -203,6 +204,35 @@ Deno.serve(async (req) => {
     return json(req, cors, { napaka: 'Neveljaven JSON payload.' }, 400);
   }
 
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+
+  if (vhod.izbrisi) {
+    const uporabnikIdZaBrisanje = String(vhod.id ?? '').trim();
+    if (!uporabnikIdZaBrisanje) {
+      return json(req, cors, { napaka: 'ID uporabnika je obvezen za brisanje.' }, 400);
+    }
+    if (uporabnikIdZaBrisanje === caller.id) {
+      return json(req, cors, { napaka: 'Trenutno prijavljenega admin uporabnika ni mogoče izbrisati.' }, 400);
+    }
+
+    const { error: profilNapaka } = await adminClient.from('uporabniki').delete().eq('id', uporabnikIdZaBrisanje);
+    if (profilNapaka) {
+      return json(req, cors, { napaka: profilNapaka.message }, 400);
+    }
+
+    const { error: authNapaka } = await adminClient.auth.admin.deleteUser(uporabnikIdZaBrisanje);
+    if (authNapaka) {
+      return json(req, cors, { napaka: authNapaka.message }, 400);
+    }
+
+    return json(req, cors, { id: uporabnikIdZaBrisanje, sporocilo: 'Uporabnik uspešno izbrisan.' });
+  }
+
   const ime = vhod.ime?.trim();
   const priimek = vhod.priimek?.trim();
   const email = vhod.email?.trim().toLowerCase();
@@ -230,13 +260,6 @@ Deno.serve(async (req) => {
       400
     );
   }
-
-  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false
-    }
-  });
 
   let uporabnikId = vhod.id;
   let obstojeciProfil: {
@@ -304,12 +327,14 @@ Deno.serve(async (req) => {
   const aktiven = vhod.aktiven ?? obstojeciProfil?.aktiven ?? true;
   const danes = new Date().toISOString().slice(0, 10);
   const vhodUporabnikDo = datumNizAliNull(vhod.uporabnik_do);
-  const zacetnoStanjeElektrike = steviloAliNull(vhod.zacetno_stanje_elektrike);
-  const zacetnoStanjeVode = steviloAliNull(vhod.zacetno_stanje_vode);
-  if (Number.isNaN(zacetnoStanjeElektrike)) {
+  const imaElektrikoVhod = Object.prototype.hasOwnProperty.call(vhod, 'zacetno_stanje_elektrike');
+  const imaVodoVhod = Object.prototype.hasOwnProperty.call(vhod, 'zacetno_stanje_vode');
+  const zacetnoStanjeElektrike = imaElektrikoVhod ? steviloAliNull(vhod.zacetno_stanje_elektrike) : undefined;
+  const zacetnoStanjeVode = imaVodoVhod ? steviloAliNull(vhod.zacetno_stanje_vode) : undefined;
+  if (zacetnoStanjeElektrike != null && Number.isNaN(zacetnoStanjeElektrike)) {
     return json(req, cors, { napaka: 'Začetno stanje elektrike mora biti 0 ali več.' }, 400);
   }
-  if (Number.isNaN(zacetnoStanjeVode)) {
+  if (zacetnoStanjeVode != null && Number.isNaN(zacetnoStanjeVode)) {
     return json(req, cors, { napaka: 'Začetno stanje vode mora biti 0 ali več.' }, 400);
   }
   const uporabnikDo = aktiven
@@ -323,8 +348,12 @@ Deno.serve(async (req) => {
     priimek,
     telefon: vhod.telefon ?? null,
     email,
-    zacetno_stanje_elektrike: zacetnoStanjeElektrike ?? obstojeciProfil?.zacetno_stanje_elektrike ?? null,
-    zacetno_stanje_vode: zacetnoStanjeVode ?? obstojeciProfil?.zacetno_stanje_vode ?? null,
+    zacetno_stanje_elektrike: imaElektrikoVhod
+      ? (zacetnoStanjeElektrike ?? null)
+      : (obstojeciProfil?.zacetno_stanje_elektrike ?? null),
+    zacetno_stanje_vode: imaVodoVhod
+      ? (zacetnoStanjeVode ?? null)
+      : (obstojeciProfil?.zacetno_stanje_vode ?? null),
     aktiven,
     admin: vhod.admin ?? false,
     uporabnik_od: datumNizAliNull(vhod.uporabnik_od) ?? danes,

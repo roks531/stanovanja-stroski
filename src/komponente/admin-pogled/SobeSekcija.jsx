@@ -29,6 +29,8 @@ import {
   ADMIN_TABELA_FLEKS_SX
 } from './adminSekcijaPostavitev';
 
+const MAX_SIRINA_SOBE_SEKCIJE = 1280;
+
 export default function SobeSekcija({
   vrsticeSobe,
   helperZaSobo,
@@ -80,7 +82,7 @@ export default function SobeSekcija({
                 onClick={potrdiPrejsnjeObracunskoObdobje}
                 disabled={potrjevanjeObdobja}
               >
-                {potrjevanjeObdobja ? 'Potrjujem...' : 'Potrdi prejsnji mesec'}
+                {potrjevanjeObdobja ? 'Odpiram...' : 'Potrdi podatke za obračune'}
               </Button>
               <Button
                 variant="outlined"
@@ -101,7 +103,7 @@ export default function SobeSekcija({
               borderRadius: 1,
               p: 1.5,
               backgroundColor: 'background.paper',
-              maxWidth: 1150
+              maxWidth: MAX_SIRINA_SOBE_SEKCIJE
             }}
           >
             <Stack
@@ -157,16 +159,16 @@ export default function SobeSekcija({
                 <TextField label="NetTV" type="number" value={novaSoba.nettv} onChange={(e) => spremeniNovoSoboStevilo('nettv', e.target.value)} InputProps={{ endAdornment: <InputAdornment position="end"><EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} /></InputAdornment> }} size="small" sx={{ flex: '1 1 96px' }} />
                 <TextField label="Fiksni" type="number" value={novaSoba.fiksni} onChange={(e) => spremeniNovoSoboStevilo('fiksni', e.target.value)} InputProps={{ endAdornment: <InputAdornment position="end"><EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} /></InputAdornment> }} size="small" sx={{ flex: '1 1 96px' }} />
                 <TextField
-                  label="Faktor ogrevanja"
+                  label="Delež ogrevanja"
                   type="number"
-                  inputProps={{ min: 0, step: '0.01' }}
+                  inputProps={{ min: 0, max: 1, step: '0.0001' }}
                   value={novaSoba.faktor_ogrevanja}
                   onChange={(e) => spremeniNovoSoboStevilo('faktor_ogrevanja', e.target.value)}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
                         <Tooltip
-                          title='Strošek ogrevanja za sobo = skupni znesek ogrevanja tipa hiše × (faktor sobe / vsota faktorjev vseh sob iste hiše). Če so vsi faktorji enaki (npr. vsi 1), se ogrevanje razdeli enakomerno.'
+                          title='Strošek ogrevanja za sobo = skupni znesek ogrevanja tipa hiše × delež sobe. Primer: 0.1900 pomeni 19 %.'
                           arrow
                           placement="top"
                         >
@@ -222,7 +224,7 @@ export default function SobeSekcija({
           {/* Tabela sob */}
           <Box
             className="tabela-polna"
-            sx={{ ...ADMIN_TABELA_FLEKS_SX, maxWidth: 1150 }}
+            sx={{ ...ADMIN_TABELA_FLEKS_SX, maxWidth: MAX_SIRINA_SOBE_SEKCIJE }}
           >
             <DataGrid
               sx={ADMIN_DATAGRID_FLEKS_SX}

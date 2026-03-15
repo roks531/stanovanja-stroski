@@ -16,18 +16,37 @@ import { Alert, Box, CircularProgress, Stack, Typography } from '@mui/material';
 
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined';
+import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import dayjs from 'dayjs';
 import { useAvtentikacija } from '../kontekst/AvtentikacijaKontekst';
 import AppLayout from './AppLayout';
 import PregledSekcija from './najemniki/PregledSekcija';
 import ObracuniSekcija from './najemniki/ObracuniSekcija';
 import DialogPodrobnostiObracuna from './najemniki/DialogPodrobnostiObracuna';
+import ObvestiloModal from './najemniki/ObvestiloModal';
+import ObvestilaSekcijaNajemnik from './najemniki/ObvestilaSekcijaNajemnik';
 import {
   izracunajTrenutniStrosek,
   pridobiNajemnikPodatke,
   shraniNajemnikovOdcitek,
   potrdiNajemnikovObracun,
+  pridobiNeprebranObvestila,
 } from '../storitve/podatki';
+
+const IMENA_MESECEV_SL = [
+  'januar',
+  'februar',
+  'marec',
+  'april',
+  'maj',
+  'junij',
+  'julij',
+  'avgust',
+  'september',
+  'oktober',
+  'november',
+  'december'
+];
 
 function denar(vrednost) {
   const znesek = Number(vrednost ?? 0);
@@ -39,8 +58,8 @@ function denar(vrednost) {
   return `${formatiran} €`;
 }
 
-function prejsnjiMesecLeto() {
-  const d = dayjs().subtract(1, 'month');
+function trenutniMesecLeto() {
+  const d = dayjs();
   return {
     mesec: d.month() + 1,
     leto: d.year()
@@ -54,9 +73,33 @@ function sobaImaVodniStevec(soba) {
   return Boolean(soba?.voda_stanje);
 }
 
+function izberiCenoZaObdobje(cene, mesec, leto) {
+  const urejeneCene = [...(cene ?? [])].sort(
+    (a, b) => dayjs(b.velja_od).valueOf() - dayjs(a.velja_od).valueOf()
+  );
+  if (urejeneCene.length === 0) return null;
+
+  // Obračun za mesec M uporablja cene iz prejšnjega meseca (M-1).
+  const obdobjeDatum = dayjs(`${Number(leto)}-${String(Number(mesec)).padStart(2, '0')}-01`)
+    .subtract(1, 'month')
+    .startOf('day');
+  if (!obdobjeDatum.isValid()) return urejeneCene[0];
+
+  return (
+    urejeneCene.find((cena) => {
+      const veljaOd = dayjs(cena.velja_od).startOf('day');
+      return veljaOd.isValid() && (veljaOd.isSame(obdobjeDatum, 'day') || veljaOd.isBefore(obdobjeDatum, 'day'));
+    }) ?? urejeneCene[0]
+  );
+}
+
 export default function NajemnikPogled() {
   const { seja, profil, odjava } = useAvtentikacija();
   const [nalaganje, setNalaganje] = useState(true);
+
+  // ── Neprebrana obvestila admina ───────────────────────────────
+  const [neprebrana, setNeprebrana] = useState([]);
+  const [modalOdprt, setModalOdprt] = useState(false);
   const [napaka, setNapaka] = useState('');
   const [napakaStevec, setNapakaStevec] = useState('');
   const [uspehStevec, setUspehStevec] = useState('');
@@ -68,7 +111,18 @@ export default function NajemnikPogled() {
   const [filterLeto, setFilterLeto] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [stranRacunov, setStranRacunov] = useState(1);
-  const privzetoObdobje = prejsnjiMesecLeto();
+  const privzetoObdobje = trenutniMesecLeto();
+  function ustvariVnosStevcaIzObdobja(obdobje) {
+    return {
+      mesec: Number(obdobje?.mesec ?? privzetoObdobje.mesec),
+      leto: Number(obdobje?.leto ?? privzetoObdobje.leto),
+      stanje_elektrike:
+        obdobje?.stanje_elektrike == null ? '' : String(obdobje.stanje_elektrike),
+      stanje_vode:
+        obdobje?.stanje_vode == null ? '' : String(obdobje.stanje_vode)
+    };
+  }
+
   const [vnosStevca, setVnosStevca] = useState({
     mesec: privzetoObdobje.mesec,
     leto: privzetoObdobje.leto,
@@ -86,20 +140,7 @@ export default function NajemnikPogled() {
         const data = await pridobiNajemnikPodatke(seja.user.id);
         if (!aktivno) return;
         setPaket(data);
-        setVnosStevca((prej) => ({
-          ...prej,
-          mesec: Number(data?.obdobjeZaVnos?.mesec ?? privzetoObdobje.mesec),
-          leto: Number(data?.obdobjeZaVnos?.leto ?? privzetoObdobje.leto),
-          stanje_elektrike:
-            data?.zadnjiOdcitek?.stanje_elektrike != null
-              ? String(data.zadnjiOdcitek.stanje_elektrike)
-              : '',
-          stanje_vode: sobaImaVodniStevec(data?.soba)
-            ? data?.zadnjiOdcitek?.stanje_vode != null
-              ? String(data.zadnjiOdcitek.stanje_vode)
-              : ''
-            : ''
-        }));
+        setVnosStevca(ustvariVnosStevcaIzObdobja(data?.obdobjeZaVnos));
       } catch (err) {
         if (!aktivno) return;
         setNapaka(err.message || 'Podatkov ni bilo mogoce naloziti.');
@@ -114,11 +155,33 @@ export default function NajemnikPogled() {
     };
   }, [seja.user.id]);
 
+  // Ob uspešnem nalaganju podatkov preveri neprebrana obvestila (enkrat)
+  useEffect(() => {
+    if (nalaganje) return;
+    let aktivno = true;
+
+    async function preveriObvestila() {
+      try {
+        const data = await pridobiNeprebranObvestila();
+        if (!aktivno || !data?.length) return;
+        setNeprebrana(data);
+        setModalOdprt(true);
+      } catch {
+        // Napake pri obvestilih tiho ignoriramo – ne blokiramo najenika
+      }
+    }
+
+    preveriObvestila();
+    return () => {
+      aktivno = false;
+    };
+  }, [nalaganje]);
+
   const izbranaCena = useMemo(() => {
     const cene = paket?.cene ?? [];
     if (cene.length === 0) return null;
-    return [...cene].sort((a, b) => dayjs(b.velja_od).valueOf() - dayjs(a.velja_od).valueOf())[0];
-  }, [paket]);
+    return izberiCenoZaObdobje(cene, vnosStevca.mesec, vnosStevca.leto);
+  }, [paket, vnosStevca.mesec, vnosStevca.leto]);
 
   const trenutno = useMemo(() => {
     if (!paket) return null;
@@ -134,10 +197,43 @@ export default function NajemnikPogled() {
     [profil?.ime, profil?.priimek].filter(Boolean).join(' ') || profil?.email || 'uporabnik';
   const sobaNaziv = paket?.soba?.ime_sobe || '-';
   const imaVodniStevec = sobaImaVodniStevec(paket?.soba);
+  const pogodbaOdFormat = paket?.pogodba_od ? dayjs(paket.pogodba_od).format('DD.MM.YYYY') : 'Ni določeno';
+  const pogodbaDoFormat = paket?.pogodba_do ? dayjs(paket.pogodba_do).format('DD.MM.YYYY') : 'Ni določeno';
+  const izbranoObdobjeVnosa = useMemo(
+    () =>
+      (paket?.obdobjaZaVnos ?? []).find(
+        (obdobje) =>
+          Number(obdobje.mesec) === Number(vnosStevca.mesec) &&
+          Number(obdobje.leto) === Number(vnosStevca.leto)
+      ) ?? paket?.obdobjeZaVnos ?? null,
+    [paket, vnosStevca.mesec, vnosStevca.leto]
+  );
+
+  useEffect(() => {
+    if (!izbranoObdobjeVnosa) return;
+
+    const naslednjiVnos = ustvariVnosStevcaIzObdobja(izbranoObdobjeVnosa);
+    setVnosStevca((prej) => {
+      if (
+        Number(prej.mesec) === Number(naslednjiVnos.mesec) &&
+        Number(prej.leto) === Number(naslednjiVnos.leto) &&
+        String(prej.stanje_elektrike) === String(naslednjiVnos.stanje_elektrike) &&
+        String(prej.stanje_vode) === String(naslednjiVnos.stanje_vode)
+      ) {
+        return prej;
+      }
+
+      return naslednjiVnos;
+    });
+  }, [izbranoObdobjeVnosa]);
 
   const predogledStevca = useMemo(() => {
-    const prejsnjeElektrike = Number(paket?.zadnjiOdcitek?.stanje_elektrike ?? 0);
-    const prejsnjeVode = Number(paket?.zadnjiOdcitek?.stanje_vode ?? 0);
+    const prejsnjeElektrike = Number(
+      izbranoObdobjeVnosa?.prejsnje_stanje_elektrike ?? paket?.zadnjiOdcitek?.stanje_elektrike ?? 0
+    );
+    const prejsnjeVode = Number(
+      izbranoObdobjeVnosa?.prejsnje_stanje_vode ?? paket?.zadnjiOdcitek?.stanje_vode ?? 0
+    );
     const novoElektrike =
       vnosStevca.stanje_elektrike === '' ? null : Number(vnosStevca.stanje_elektrike);
     const novoVode = vnosStevca.stanje_vode === '' ? null : Number(vnosStevca.stanje_vode);
@@ -183,7 +279,7 @@ export default function NajemnikPogled() {
       veljavno: napakeVnosa.length === 0,
       napakeVnosa
     };
-  }, [paket, izbranaCena, vnosStevca, imaVodniStevec]);
+  }, [izbranoObdobjeVnosa, paket, izbranaCena, vnosStevca, imaVodniStevec]);
 
   const trenutniPrikaz = useMemo(() => {
     if (!paket?.soba || !izbranaCena) return null;
@@ -279,10 +375,19 @@ export default function NajemnikPogled() {
         (racun?.strosek_vode ?? 0)
     );
 
-  const jeOgrevanjeZaklenjeno = paket?.ogrevanjePripravljeno === false;
+  const jeOgrevanjeZaklenjeno =
+    izbranoObdobjeVnosa
+      ? izbranoObdobjeVnosa.ogrevanjePripravljeno === false
+      : paket?.ogrevanjePripravljeno === false;
+  const jeObdobjeZeOddano = Boolean(izbranoObdobjeVnosa?.odcitek_obstaja);
+  const nazivObdobjaVnosa =
+    `${IMENA_MESECEV_SL[Number(vnosStevca.mesec) - 1] ?? String(vnosStevca.mesec)} ${vnosStevca.leto}`;
+  const sporociloZeOddano =
+    `Za obdobje ${nazivObdobjaVnosa} so podatki že oddani. Če opaziš napako, kontaktiraj najemodajalca.`;
   const sporociloZaklepaOgrevanja =
+    izbranoObdobjeVnosa?.sporociloZaklepaOgrevanja ||
     paket?.sporociloZaklepaOgrevanja ||
-    'Najemodajalec še ni izračunal stroška ogrevanja, poskusi ponovno jutri. Kontakt: lastnik@example.com';
+    'Najemodajalec še ni izračunal stroška ogrevanja, poskusi ponovno jutri.';
 
   const letaRacunov = useMemo(
     () =>
@@ -327,64 +432,6 @@ export default function NajemnikPogled() {
     }
   }, [izbranRacun, podrobnostiOdprte]);
 
-  async function shraniStevce(e) {
-    e.preventDefault();
-    setNapakaStevec('');
-    setUspehStevec('');
-
-    if (!paket?.soba?.id) {
-      setNapakaStevec('Soba ni določena.');
-      return;
-    }
-
-    if (jeOgrevanjeZaklenjeno) {
-      setNapakaStevec(sporociloZaklepaOgrevanja);
-      return;
-    }
-
-    if (!predogledStevca.veljavno) {
-      setNapakaStevec(predogledStevca.napakeVnosa[0] || 'Vnos ni veljaven.');
-      return;
-    }
-
-    setShranjevanjeStevca(true);
-    try {
-      await shraniNajemnikovOdcitek(
-        {
-          soba_id: paket.soba.id,
-          uporabnik_id: seja.user.id,
-          mesec: Number(vnosStevca.mesec),
-          leto: Number(vnosStevca.leto),
-          stanje_elektrike: Number(vnosStevca.stanje_elektrike),
-          stanje_vode: imaVodniStevec ? Number(vnosStevca.stanje_vode) : null
-        },
-        seja.user.id
-      );
-
-      const osvezeno = await pridobiNajemnikPodatke(seja.user.id);
-      setPaket(osvezeno);
-      setVnosStevca((prej) => ({
-        ...prej,
-        mesec: Number(osvezeno?.obdobjeZaVnos?.mesec ?? privzetoObdobje.mesec),
-        leto: Number(osvezeno?.obdobjeZaVnos?.leto ?? privzetoObdobje.leto),
-        stanje_elektrike:
-          osvezeno?.zadnjiOdcitek?.stanje_elektrike != null
-            ? String(osvezeno.zadnjiOdcitek.stanje_elektrike)
-            : '',
-        stanje_vode: sobaImaVodniStevec(osvezeno?.soba)
-          ? osvezeno?.zadnjiOdcitek?.stanje_vode != null
-            ? String(osvezeno.zadnjiOdcitek.stanje_vode)
-            : ''
-          : ''
-      }));
-      setUspehStevec('Stanje števcev je uspešno shranjeno. Zdaj klikni "Potrdi obračun".');
-    } catch (err) {
-      setNapakaStevec(err.message || 'Stanja števcev ni bilo mogoče shraniti.');
-    } finally {
-      setShranjevanjeStevca(false);
-    }
-  }
-
   async function potrdiObracun() {
     setNapakaStevec('');
     setUspehStevec('');
@@ -399,8 +446,43 @@ export default function NajemnikPogled() {
       return;
     }
 
-    setPotrjevanjeObracuna(true);
+    if (jeObdobjeZeOddano) {
+      setNapakaStevec(sporociloZeOddano);
+      return;
+    }
+
+    if (!predogledStevca.veljavno) {
+      setNapakaStevec(predogledStevca.napakeVnosa[0] || 'Vnos ni veljaven.');
+      return;
+    }
+
+    setShranjevanjeStevca(true);
     try {
+      try {
+        await shraniNajemnikovOdcitek(
+          {
+            soba_id: paket.soba.id,
+            uporabnik_id: seja.user.id,
+            mesec: Number(vnosStevca.mesec),
+            leto: Number(vnosStevca.leto),
+            stanje_elektrike: Number(vnosStevca.stanje_elektrike),
+            stanje_vode: imaVodniStevec ? Number(vnosStevca.stanje_vode) : null
+          },
+          seja.user.id
+        );
+      } catch (err) {
+        const sporocilo = String(err?.message ?? '');
+        const jeOdcitekZeVnesen =
+          sporocilo.toLowerCase().includes('odčitek že vnesen') ||
+          sporocilo.toLowerCase().includes('odcitek ze vnesen');
+        if (!jeOdcitekZeVnesen) {
+          throw err;
+        }
+      }
+
+      setShranjevanjeStevca(false);
+      setPotrjevanjeObracuna(true);
+
       await potrdiNajemnikovObracun(
         {
           soba_id: paket.soba.id,
@@ -413,24 +495,28 @@ export default function NajemnikPogled() {
 
       const osvezeno = await pridobiNajemnikPodatke(seja.user.id);
       setPaket(osvezeno);
-      setUspehStevec('Obračun je potrjen in shranjen v evidenco obračunov.');
+      setVnosStevca(ustvariVnosStevcaIzObdobja(osvezeno?.obdobjeZaVnos));
+      setUspehStevec('Števci so shranjeni, obračun pa uspešno potrjen.');
     } catch (err) {
-      setNapakaStevec(err.message || 'Obračuna ni bilo mogoče potrditi.');
+      setNapakaStevec(err.message || 'Števcev in obračuna ni bilo mogoče potrditi.');
     } finally {
+      setShranjevanjeStevca(false);
       setPotrjevanjeObracuna(false);
     }
   }
 
-  // ── Navigacija najemnika (2 sekciji) ──────────────────
-  const SEKCIJA_PREGLED = 0;
-  const SEKCIJA_RACUNI  = 1;
+  // ── Navigacija najemnika (3 sekcije) ──────────────────
+  const SEKCIJA_PREGLED    = 0;
+  const SEKCIJA_RACUNI     = 1;
+  const SEKCIJA_OBVESTILA  = 2;
 
   // Aktivna sekcija stranskega menija
   const [sekcija, setSekcija] = useState(SEKCIJA_PREGLED);
 
   const navigacijaNajemnik = [
-    { id: SEKCIJA_PREGLED, label: 'Pregled & Vnos',  ikona: <DashboardOutlinedIcon /> },
-    { id: SEKCIJA_RACUNI,  label: 'Obračuni',         ikona: <ReceiptOutlinedIcon /> },
+    { id: SEKCIJA_PREGLED,   label: 'Pregled & Vnos', ikona: <DashboardOutlinedIcon /> },
+    { id: SEKCIJA_RACUNI,    label: 'Obračuni',        ikona: <ReceiptOutlinedIcon /> },
+    { id: SEKCIJA_OBVESTILA, label: 'Obvestila',       ikona: <CampaignOutlinedIcon /> },
   ];
 
   if (nalaganje) {
@@ -452,14 +538,24 @@ export default function NajemnikPogled() {
   }
 
   return (
-    <AppLayout
-      navigacija={navigacijaNajemnik}
-      aktivnaSekcija={sekcija}
-      onSpremembaSekcije={setSekcija}
-      naslov={prijavljenNaziv}
-      podnaslov={`Soba ${sobaNaziv}`}
-      onOdjava={odjava}
-      brandPodnaslov="Obračuni"
+    <>
+      {/* ── Obvestila admina ── */}
+      {modalOdprt && neprebrana.length > 0 && (
+        <ObvestiloModal
+          obvestila={neprebrana}
+          uporabnikId={seja.user.id}
+          onVsaPrebrana={() => setModalOdprt(false)}
+        />
+      )}
+
+      <AppLayout
+        navigacija={navigacijaNajemnik}
+        aktivnaSekcija={sekcija}
+        onSpremembaSekcije={setSekcija}
+        naslov={prijavljenNaziv}
+        podnaslov={`Soba ${sobaNaziv}`}
+        onOdjava={odjava}
+        brandPodnaslov="Obračuni"
     >
       <Box sx={{ maxWidth: 860, width: '100%' }}>
       {/* ── Globalna napaka ── */}
@@ -474,19 +570,35 @@ export default function NajemnikPogled() {
         <PregledSekcija
           prijavljenNaziv={prijavljenNaziv}
           sobaNaziv={sobaNaziv}
+          prikaziPogodbo={Boolean(paket?.pogodba_od || paket?.pogodba_do)}
+          pogodbaOdFormat={pogodbaOdFormat}
+          pogodbaDoFormat={pogodbaDoFormat}
+          moznostiObdobijZaVnos={(paket?.obdobjaZaVnos ?? []).map((obdobje) => ({
+            value: `${obdobje.mesec}|${obdobje.leto}`,
+            label: obdobje.oznaka
+          }))}
           imaVodniStevec={imaVodniStevec}
           denar={denar}
           trenutniPrikaz={trenutniPrikaz}
           vnosStevca={vnosStevca}
+          spremeniObdobjeVnosa={(vrednost) => {
+            const [mesec, leto] = String(vrednost ?? '').split('|');
+            setVnosStevca((prej) => ({
+              ...prej,
+              mesec: Number(mesec ?? prej.mesec),
+              leto: Number(leto ?? prej.leto)
+            }));
+          }}
           jeOgrevanjeZaklenjeno={jeOgrevanjeZaklenjeno}
           sporociloZaklepaOgrevanja={sporociloZaklepaOgrevanja}
+          jeObdobjeZeOddano={jeObdobjeZeOddano}
+          sporociloZeOddano={sporociloZeOddano}
           predogledStevca={predogledStevca}
           setVnosStevca={setVnosStevca}
           napakaStevec={napakaStevec}
           uspehStevec={uspehStevec}
           shranjevanjeStevca={shranjevanjeStevca}
           potrjevanjeObracuna={potrjevanjeObracuna}
-          shraniStevce={shraniStevce}
           potrdiObracun={potrdiObracun}
         />
       )}
@@ -510,6 +622,10 @@ export default function NajemnikPogled() {
           setPodrobnostiOdprte={setPodrobnostiOdprte}
         />
       )}
+      {/* SEKCIJA 2 – OBVESTILA */}
+      {sekcija === SEKCIJA_OBVESTILA && (
+        <ObvestilaSekcijaNajemnik />
+      )}
       </Box>
 
       <DialogPodrobnostiObracuna
@@ -520,5 +636,6 @@ export default function NajemnikPogled() {
         skupniZnesekRacuna={skupniZnesekRacuna}
       />
     </AppLayout>
+    </>
   );
 }

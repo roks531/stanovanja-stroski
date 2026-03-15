@@ -5,14 +5,14 @@
  * Na mobitelih je meni skrit v "Drawer" predalu (hamburger ikona).
  * Na namizju je meni vedno viden (zložljiv na ikone).
  *
- * Props:
- *   navigacija  – array menuji: { id, label, ikona: JSX, ikona: ReactElement }
+ * Parametri:
+ *   navigacija  – seznam menijev: { id, label, ikona: JSX, ikona: ReactElement }
  *   aktivnaSekcija – trenutno aktivna sekcija (id)
- *   onSpremembaSekcije – callback(id) ko user klikne menu item
+ *   onSpremembaSekcije – povratni klic z `id` ob kliku na element menija
  *   naslov – napis v glavi menija (npr. "Admin nadzor")
  *   podnaslov – manjši napis pod naslovom (npr. email)
  *   children – vsebina desnega dela
- *   onOdjava – callback za odjavo
+ *   onOdjava – povratni klic za odjavo
  */
 import { useState } from 'react';
 import {

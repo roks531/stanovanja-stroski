@@ -1,5 +1,5 @@
 /**
- * Dialog s podrobno razčlenitvijo posameznega obračuna.
+ * Pogovorno okno s podrobno razčlenitvijo posameznega obračuna.
  */
 import {
   Alert,

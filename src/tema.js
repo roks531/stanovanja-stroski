@@ -317,7 +317,7 @@ const tema = createTheme({
       },
     },
 
-    // ---------- Dialog ----------
+    // ---------- Pogovorno okno ----------
     MuiDialog: {
       styleOverrides: {
         paper: {

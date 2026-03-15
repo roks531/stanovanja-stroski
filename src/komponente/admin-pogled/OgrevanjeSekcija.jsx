@@ -1,6 +1,7 @@
 /**
  * Sekcija "Ogrevanje" za urejanje mesečnih zneskov po tipu hiše.
  */
+import { useMemo } from 'react';
 import {
   Box,
   Button,
@@ -8,14 +9,17 @@ import {
   CardContent,
   Chip,
   Grid,
+  IconButton,
   InputAdornment,
   Stack,
   TextField,
+  Tooltip,
   Typography
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import EuroSymbolOutlinedIcon from '@mui/icons-material/EuroSymbolOutlined';
+import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import SearchableSelect from '../SearchableSelect';
 import {
   ADMIN_DATAGRID_FLEKS_SX,
@@ -45,12 +49,52 @@ export default function OgrevanjeSekcija({
   lokalizacijaMreze,
   izberiOgrevanjeZaUrejanje,
   shraniOgrevanjePoTipu,
+  izbrisiOgrevanjeVrstico,
   ponastaviOgrevanjeForm,
   novoOgrevanje,
   setNovoOgrevanje,
   tipiHise,
   imenaMesecov
 }) {
+  const stolpciOgrevanjeZBrisanjem = useMemo(() => {
+    const akcije = {
+      field: 'akcije_ogrevanje',
+      headerName: '',
+      width: 56,
+      sortable: false,
+      filterable: false,
+      disableColumnMenu: true,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => (
+        <Tooltip title="Izbriši ogrevanje">
+          <span>
+            <IconButton
+              size="small"
+              color="error"
+              onClick={(e) => {
+                e.stopPropagation();
+                izbrisiOgrevanjeVrstico?.(params.row);
+              }}
+              aria-label="Izbriši ogrevanje"
+            >
+              <DeleteOutlineOutlinedIcon sx={{ fontSize: 17 }} />
+            </IconButton>
+          </span>
+        </Tooltip>
+      )
+    };
+
+    const indeksOpombe = stolpciOgrevanjeTipi.findIndex((stolpec) => stolpec.field === 'opomba');
+    if (indeksOpombe < 0) return [...stolpciOgrevanjeTipi, akcije];
+
+    return [
+      ...stolpciOgrevanjeTipi.slice(0, indeksOpombe + 1),
+      akcije,
+      ...stolpciOgrevanjeTipi.slice(indeksOpombe + 1)
+    ];
+  }, [stolpciOgrevanjeTipi, izbrisiOgrevanjeVrstico]);
+
   return (
     <Card className="kartica-jeklo" sx={ADMIN_SEKCIJA_CARD_SX}>
       <CardContent sx={ADMIN_SEKCIJA_CONTENT_SX}>
@@ -87,7 +131,7 @@ export default function OgrevanjeSekcija({
                 <DataGrid
                   sx={ADMIN_DATAGRID_FLEKS_SX}
                   rows={vrsticeOgrevanjeTipi}
-                  columns={stolpciOgrevanjeTipi}
+                  columns={stolpciOgrevanjeZBrisanjem}
                   density="compact"
                   rowHeight={56}
                   disableRowSelectionOnClick
