@@ -298,10 +298,17 @@ function daNe(vrednost) {
   return vrednost ? 'da' : 'ne';
 }
 
+function obdobjeSortKljuc(vrednost) {
+  const niz = String(vrednost ?? '').trim();
+  const deli = niz.split('.');
+  if (deli.length !== 2) return 0;
+  const mesec = Number(deli[0]);
+  const leto = Number(deli[1]);
+  if (!Number.isFinite(mesec) || !Number.isFinite(leto)) return 0;
+  return (leto * 100) + mesec;
+}
+
 function sobaImaVodniStevec(soba) {
-  const tipHise = String(soba?.tip_hise ?? '').toLowerCase();
-  if (tipHise === 'velika') return true;
-  if (tipHise === 'stara') return false;
   return Boolean(soba?.voda_stanje);
 }
 
@@ -453,7 +460,29 @@ const stolpciSobe = [
     }
   },
 
-  // ── Voda (fiksna za stara / števec za velika) ──────────────────
+  // ── Način vode (fiksni strošek ali števec) ─────────────────────
+  {
+    field: 'voda_stanje',
+    headerName: 'Vodni števec',
+    width: 112,
+    editable: true,
+    type: 'boolean',
+    align: 'center',
+    headerAlign: 'center',
+    renderCell: (params) => (
+      params.value
+        ? <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.35, px: 0.6, py: 0.15, borderRadius: '4px', background: '#dbeafe', border: '1px solid #bfdbfe' }}>
+            <WaterDropOutlinedIcon sx={{ fontSize: 11, color: '#3b82f6' }} />
+            <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: '#1d4ed8' }}>da</Typography>
+          </Box>
+        : <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.35, px: 0.6, py: 0.15, borderRadius: '4px', background: '#f1f5f9', border: '1px solid #cbd5e1' }}>
+            <RadioButtonUncheckedIcon sx={{ fontSize: 11, color: '#94a3b8' }} />
+            <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b' }}>ne</Typography>
+          </Box>
+    )
+  },
+
+  // ── Voda (fiksni strošek ali števec) ───────────────────────────
   {
     field: 'voda',
     headerName: 'Voda',
@@ -487,11 +516,11 @@ const stolpciSobe = [
     }
   },
 
-  // ── Mesečni fiksni stroški ─────────────────────────────────────
+  // ── Mesečni stroški ────────────────────────────────────────────
   { field: 'najemnina',     headerName: 'Najemnina', width: 108, editable: true, type: 'number', renderCell: renderDenarCelica },
   { field: 'strosek_skupni', headerName: 'Skupni',   width: 100, editable: true, type: 'number', renderCell: renderDenarCelica },
   { field: 'nettv',          headerName: 'NetTV',    width: 96,  editable: true, type: 'number', renderCell: renderDenarCelica },
-  { field: 'fiksni',         headerName: 'Fiksni',   width: 96,  editable: true, type: 'number', renderCell: renderDenarCelica },
+  { field: 'fiksni',         headerName: 'Drugo',    width: 96,  editable: true, type: 'number', renderCell: renderDenarCelica },
 
   // ── Ogrevanje + Delež ──────────────────────────────────────
   {
@@ -693,6 +722,7 @@ const stolpciAdminStevci = [
     field: 'obdobje',
     headerName: 'Obdobje',
     width: 100,
+    sortComparator: (v1, v2) => obdobjeSortKljuc(v1) - obdobjeSortKljuc(v2),
     renderCell: (params) => (
       <Box sx={{ px: 0.75, py: 0.2, borderRadius: '4px', background: '#f0fdf4', border: '1px solid #a7f3d0', display: 'inline-flex' }}>
         <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#065f46' }}>{params.value}</Typography>
@@ -948,7 +978,7 @@ const stolpciObracuni = [
   // ── Najemnik ─────────────────────────────────────────────────────
   { field: 'uporabnik', headerName: 'Najemnik', width: 136 },
 
-  // ── Fiksni stroški (urejljivo, manjoe vrednosti) ─────────────────
+  // ── Stroški (urejljivo, manjše vrednosti) ───────────────────────
   {
     field: 'najemnina',
     headerName: 'Najemnina',
@@ -975,7 +1005,7 @@ const stolpciObracuni = [
   },
   {
     field: 'strosek_tv',
-    headerName: 'Fiksni',
+    headerName: 'Drugo',
     width: 74,
     editable: true,
     type: 'number',
@@ -1010,7 +1040,6 @@ const stolpciObracuni = [
           <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
             {Number(params.value ?? 0)}
           </Typography>
-          <Typography sx={{ fontSize: '0.65rem', color: '#94a3b8' }}>kWh</Typography>
         </Stack>
         {/* Consumption delta badge */}
         <PorabaBadge vrednost={Number(params.row.poraba_elektrike ?? 0)} enota="kWh" barva="amber" />
@@ -1022,7 +1051,7 @@ const stolpciObracuni = [
   {
     field: 'stanje_vode',
     headerName: 'Voda',
-    width: 122,
+    width: 152,
     editable: true,
     sortable: false,
     type: 'number',
@@ -1039,9 +1068,6 @@ const stolpciObracuni = [
             <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
               {niVode ? '—' : Number(params.value)}
             </Typography>
-            {!niVode && (
-              <Typography sx={{ fontSize: '0.65rem', color: '#94a3b8' }}>m³</Typography>
-            )}
           </Stack>
           {niVode
             ? (

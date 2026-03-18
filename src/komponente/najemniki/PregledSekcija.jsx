@@ -250,6 +250,9 @@ export default function PregledSekcija({
                     <Stack direction="row" alignItems="center" spacing={0.75} mb={1.25}>
                       <WaterDropOutlinedIcon sx={{ fontSize: 16, color: '#3b82f6' }} />
                       <Typography variant="subtitle2" fontWeight={700}>Voda</Typography>
+                      <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 700, ml: 'auto' }}>
+                        Ločilo je pika (.)
+                      </Typography>
                     </Stack>
                     <Grid container spacing={1}>
                       <Grid size={6}>
@@ -268,6 +271,7 @@ export default function PregledSekcija({
                           size="small"
                           label="Novo stanje *"
                           type="number"
+                          inputProps={{ min: 0, step: '0.001' }}
                           disabled={jeOgrevanjeZaklenjeno}
                           value={vnosStevca.stanje_vode}
                           onChange={(e) => setVnosStevca((p) => ({ ...p, stanje_vode: e.target.value }))}
@@ -336,7 +340,7 @@ export default function PregledSekcija({
                     <StrosekVrstica label="Najemnina" vrednost={denar(trenutniPrikaz.najemnina)} />
                     <StrosekVrstica label="Skupni stroški" vrednost={denar(trenutniPrikaz.strosekSkupni)} />
                     <StrosekVrstica label="NetTV" vrednost={denar(trenutniPrikaz.strosekNeta)} />
-                    <StrosekVrstica label="Fiksni" vrednost={denar(trenutniPrikaz.strosekTv)} />
+                    <StrosekVrstica label="Drugo" vrednost={denar(trenutniPrikaz.strosekTv)} />
 
                     <Divider sx={{ my: 1 }} />
 

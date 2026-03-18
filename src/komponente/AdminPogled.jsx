@@ -174,6 +174,7 @@ export default function AdminPogled() {
     id: '',
     ime_sobe: '',
     tip_hise: 'velika',
+    voda_stanje: true,
     voda: 0,
     aktivna: true,
     najemnina: 0,
@@ -317,6 +318,7 @@ export default function AdminPogled() {
       id: soba.id,
       ime_sobe: soba.ime_sobe ?? '',
       tip_hise: soba.tip_hise ?? 'velika',
+      voda_stanje: Boolean(soba.voda_stanje),
       voda: Number(soba.voda ?? 0),
       aktivna: Boolean(soba.aktivna),
       najemnina: Number(soba.najemnina ?? 0),
@@ -382,6 +384,7 @@ export default function AdminPogled() {
       id: '',
       ime_sobe: '',
       tip_hise: 'velika',
+      voda_stanje: true,
       voda: 0,
       aktivna: true,
       najemnina: 0,
@@ -442,14 +445,14 @@ export default function AdminPogled() {
     const tipHise = String(vrednosti.tip_hise ?? '').trim();
     const { najemnina, skupni, netTv, fiksni, delezOgrevanja } = normalizirajSobaStroske(vrednosti);
     const voda = Number(vrednosti.voda ?? 0);
-    const imaVodniStevec = sobaImaVodniStevec({ tip_hise: tipHise });
+    const imaVodniStevec = Boolean(vrednosti.voda_stanje);
 
     if (!imeSobe) throw new Error('Polje Soba je obvezno.');
     if (!tipiHise.includes(tipHise)) throw new Error('Hiša mora biti "stara" ali "velika".');
     if (!Number.isFinite(najemnina) || najemnina < 0) throw new Error('Najemnina mora biti 0 ali vec.');
     if (!Number.isFinite(skupni) || skupni < 0) throw new Error('Skupni strosek mora biti 0 ali vec.');
     if (!Number.isFinite(netTv) || netTv < 0) throw new Error('Strosek NetTV mora biti 0 ali vec.');
-    if (!Number.isFinite(fiksni) || fiksni < 0) throw new Error('Strosek fiksni mora biti 0 ali vec.');
+    if (!Number.isFinite(fiksni) || fiksni < 0) throw new Error('Strosek "drugo" mora biti 0 ali vec.');
     if (!Number.isFinite(delezOgrevanja) || delezOgrevanja < 0 || delezOgrevanja > 1) {
       throw new Error('Delež ogrevanja mora biti med 0 in 1 (npr. 0.1900).');
     }
@@ -583,6 +586,7 @@ export default function AdminPogled() {
         id: s.id,
         ime_sobe: s.ime_sobe,
         tip_hise: s.tip_hise,
+        voda_stanje: Boolean(s.voda_stanje),
         voda: Number(s.voda ?? 0),
         najemnina: Number(s.najemnina ?? 0),
         aktivna: Boolean(s.aktivna)
@@ -1125,6 +1129,7 @@ export default function AdminPogled() {
       ...novaVrstica,
       ime_sobe: shranjena.ime_sobe,
       tip_hise: shranjena.tip_hise,
+      voda_stanje: Boolean(shranjena.voda_stanje),
       voda: Number(shranjena.voda ?? 0),
       najemnina: Number(shranjena.najemnina ?? 0),
       strosek_skupni: Number(shranjena.strosek_skupni ?? 0),
@@ -1619,7 +1624,7 @@ export default function AdminPogled() {
       { vrednost: najemnina, ime: 'Najemnina' },
       { vrednost: strosekSkupni, ime: 'Skupni strošek' },
       { vrednost: strosekNeta, ime: 'NetTV' },
-      { vrednost: strosekTv, ime: 'Fiksni strošek' },
+      { vrednost: strosekTv, ime: 'Drugo' },
       { vrednost: strosekOgrevanja, ime: 'Ogrevanje' }
     ];
 
@@ -1805,7 +1810,7 @@ export default function AdminPogled() {
       const najemnina = parsePozitivno(vnos?.najemnina, 'Najemnina');
       const strosekSkupni = parsePozitivno(vnos?.strosek_skupni, 'Skupni strošek');
       const strosekNeta = parsePozitivno(vnos?.strosek_neta, 'NetTV');
-      const strosekTv = parsePozitivno(vnos?.strosek_tv, 'Fiksni strošek');
+      const strosekTv = parsePozitivno(vnos?.strosek_tv, 'Drugo');
       const strosekOgrevanja = parsePozitivno(vnos?.strosek_ogrevanja, 'Ogrevanje');
       const strosekElektrike = parsePozitivno(vnos?.strosek_elektrike, 'Strošek elektrike');
       const strosekVode = parsePozitivno(vnos?.strosek_vode, 'Strošek vode');
@@ -1975,7 +1980,7 @@ export default function AdminPogled() {
         { key: 'najemnina', label: 'Najemnina' },
         { key: 'skupni', label: 'Skupni' },
         { key: 'net_tv', label: 'NetTV' },
-        { key: 'fiksni', label: 'Fiksni' },
+        { key: 'fiksni', label: 'Drugo' },
         { key: 'ogrevanje', label: 'Ogrevanje' },
         { key: 'faktor_ogrevanja', label: 'Delež ogrevanja' },
         { key: 'posodobil', label: 'Posodobil' },
@@ -2149,7 +2154,7 @@ export default function AdminPogled() {
         { key: 'najemnina', label: 'Najemnina (EUR)' },
         { key: 'skupni', label: 'Skupni (EUR)' },
         { key: 'net_tv', label: 'NetTV (EUR)' },
-        { key: 'fiksni', label: 'Fiksni (EUR)' },
+        { key: 'fiksni', label: 'Drugo (EUR)' },
         { key: 'ogrevanje', label: 'Ogrevanje (EUR)' },
         { key: 'skupaj', label: 'Skupaj (EUR)' },
         { key: 'placano', label: 'Potrjeno' },

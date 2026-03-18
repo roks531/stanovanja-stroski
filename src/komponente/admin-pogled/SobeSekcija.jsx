@@ -71,7 +71,7 @@ export default function SobeSekcija({
                 <Chip size="small" color="primary" label={`${vrsticeSobe.length} sob`} />
               </Stack>
               <Typography variant="body2" color="text.secondary" mt={0.25}>
-                {helperZaSobo()} Za hišo "stara" vpiši fiksni strošek vode, v "velika" se voda računa po števcu.
+                {helperZaSobo()} Vključi "Vodni števec", če se voda računa po števcu. Izklop pomeni fiksni strošek vode.
               </Typography>
             </Box>
             <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -146,8 +146,7 @@ export default function SobeSekcija({
                   onChange={(novaVrednost) =>
                     setNovaSoba((prej) => ({
                       ...prej,
-                      tip_hise: novaVrednost,
-                      voda: novaVrednost === 'velika' ? 0 : Number(prej.voda ?? 0)
+                      tip_hise: novaVrednost
                     }))
                   }
                   options={tipiHise.map((tip) => ({ value: tip, label: tip }))}
@@ -157,7 +156,7 @@ export default function SobeSekcija({
                 <TextField label="Najemnina" type="number" value={novaSoba.najemnina} onChange={(e) => spremeniNovoSoboStevilo('najemnina', e.target.value)} InputProps={{ endAdornment: <InputAdornment position="end"><EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} /></InputAdornment> }} size="small" sx={{ flex: '1 1 96px' }} />
                 <TextField label="Skupni" type="number" value={novaSoba.strosek_skupni} onChange={(e) => spremeniNovoSoboStevilo('strosek_skupni', e.target.value)} InputProps={{ endAdornment: <InputAdornment position="end"><EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} /></InputAdornment> }} size="small" sx={{ flex: '1 1 96px' }} />
                 <TextField label="NetTV" type="number" value={novaSoba.nettv} onChange={(e) => spremeniNovoSoboStevilo('nettv', e.target.value)} InputProps={{ endAdornment: <InputAdornment position="end"><EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} /></InputAdornment> }} size="small" sx={{ flex: '1 1 96px' }} />
-                <TextField label="Fiksni" type="number" value={novaSoba.fiksni} onChange={(e) => spremeniNovoSoboStevilo('fiksni', e.target.value)} InputProps={{ endAdornment: <InputAdornment position="end"><EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} /></InputAdornment> }} size="small" sx={{ flex: '1 1 96px' }} />
+                <TextField label="Drugo" type="number" value={novaSoba.fiksni} onChange={(e) => spremeniNovoSoboStevilo('fiksni', e.target.value)} InputProps={{ endAdornment: <InputAdornment position="end"><EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} /></InputAdornment> }} size="small" sx={{ flex: '1 1 96px' }} />
                 <TextField
                   label="Delež ogrevanja"
                   type="number"
@@ -191,8 +190,8 @@ export default function SobeSekcija({
                       <InputAdornment position="end">
                         <Tooltip
                           title={sobaImaVodniStevec(novaSoba)
-                            ? 'V hiši "velika" se voda računa po števcu.'
-                            : 'Fiksni strošek vode za sobo.'}
+                            ? 'Voda se računa po števcu.'
+                            : 'Strošek vode za sobo.'}
                           arrow
                           placement="top"
                         >
@@ -209,6 +208,11 @@ export default function SobeSekcija({
               </Box>
 
               <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ ml: '2px' }}>
+                <FormControlLabel
+                  control={<Switch size="small" checked={Boolean(novaSoba.voda_stanje)} onChange={(e) => spremeniNovoSoboBool('voda_stanje', e.target.checked)} />}
+                  label="Vodni števec"
+                  sx={{ ml: 0 }}
+                />
                 <FormControlLabel
                   control={<Switch size="small" checked={novaSoba.aktivna} onChange={(e) => spremeniNovoSoboBool('aktivna', e.target.checked)} />}
                   label="Aktivna soba"

@@ -152,6 +152,17 @@ export default function CeneStevciSekcija({
     return [...stolpciBrezAkcij, stolpecBrisanje];
   }, [stolpciAdminStevci, izbrisiStevecAdminVrstico]);
 
+  const vrsticeStevciAdminUrejene = useMemo(
+    () =>
+      [...(vrsticeStevciAdminFiltrirane ?? [])].sort((a, b) => {
+        const kljucA = (Number(a?.leto ?? 0) * 100) + Number(a?.mesec ?? 0);
+        const kljucB = (Number(b?.leto ?? 0) * 100) + Number(b?.mesec ?? 0);
+        if (kljucA !== kljucB) return kljucB - kljucA; // novejše obdobje najprej
+        return String(a?.soba ?? '').localeCompare(String(b?.soba ?? ''), 'sl');
+      }),
+    [vrsticeStevciAdminFiltrirane]
+  );
+
   return (
     <Card className="kartica-jeklo" sx={ADMIN_SEKCIJA_CARD_SX}>
       <CardContent sx={ADMIN_SEKCIJA_CONTENT_SX}>
@@ -363,7 +374,7 @@ export default function CeneStevciSekcija({
                   >
                     <DataGrid
                       sx={ADMIN_DATAGRID_FLEKS_SX}
-                      rows={vrsticeStevciAdminFiltrirane}
+                      rows={vrsticeStevciAdminUrejene}
                       columns={stolpciStevciZBrisanjem}
                       density="compact"
                       rowHeight={66}
@@ -371,7 +382,10 @@ export default function CeneStevciSekcija({
                       pageSizeOptions={moznostiStrani}
                       localeText={lokalizacijaMreze}
                       onRowClick={(params) => izberiStevecAdminZaUrejanje(params.id)}
-                      initialState={{ pagination: { paginationModel: { pageSize: 100, page: 0 } } }}
+                      initialState={{
+                        pagination: { paginationModel: { pageSize: 100, page: 0 } },
+                        sorting: { sortModel: [{ field: 'obdobje', sort: 'desc' }] }
+                      }}
                     />
                   </Box>
                 </Grid>
@@ -472,6 +486,7 @@ export default function CeneStevciSekcija({
                         <TextField
                           label="V prejšnje"
                           type="number"
+                          inputProps={{ min: 0, step: '0.001' }}
                           value={novStevecAdmin.prejsnje_stanje_vode}
                           onChange={(e) =>
                             setNovStevecAdmin((prej) => ({ ...prej, prejsnje_stanje_vode: e.target.value }))
@@ -483,6 +498,7 @@ export default function CeneStevciSekcija({
                         <TextField
                           label="V novo"
                           type="number"
+                          inputProps={{ min: 0, step: '0.001' }}
                           value={novStevecAdmin.stanje_vode}
                           onChange={(e) =>
                             setNovStevecAdmin((prej) => ({ ...prej, stanje_vode: e.target.value }))

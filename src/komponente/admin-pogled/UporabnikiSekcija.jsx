@@ -443,7 +443,7 @@ export default function UporabnikiSekcija({
                     }
                     size="small"
                     sx={{ flex: '1 1 170px' }}
-                    inputProps={{ min: 0, step: 1 }}
+                    inputProps={{ min: 0, step: '0.001' }}
                     disabled={!sobaImaVodniStevecZaNovUporabnik}
                     helperText={!sobaImaVodniStevecZaNovUporabnik
                       ? 'Soba nima vodnega števca'

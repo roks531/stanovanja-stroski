@@ -58,6 +58,12 @@ function denar(vrednost) {
   return `${formatiran} €`;
 }
 
+function zaokrozi(vrednost, decimalke = 3) {
+  const stevilo = Number(vrednost);
+  if (!Number.isFinite(stevilo)) return 0;
+  return Number(stevilo.toFixed(decimalke));
+}
+
 function trenutniMesecLeto() {
   const d = dayjs();
   return {
@@ -67,9 +73,6 @@ function trenutniMesecLeto() {
 }
 
 function sobaImaVodniStevec(soba) {
-  const tipHise = String(soba?.tip_hise ?? '').toLowerCase();
-  if (tipHise === 'velika') return true;
-  if (tipHise === 'stara') return false;
   return Boolean(soba?.voda_stanje);
 }
 
@@ -259,7 +262,7 @@ export default function NajemnikPogled() {
         : 0;
     const porabaVode =
       imaVodniStevec && novoVode !== null && Number.isFinite(novoVode)
-        ? Math.max(0, novoVode - prejsnjeVode)
+        ? zaokrozi(Math.max(0, novoVode - prejsnjeVode), 3)
         : 0;
 
     const strosekElektrike = Number(

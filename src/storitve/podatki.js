@@ -34,9 +34,6 @@ function jeVeljavnoObdobje(mesec, leto) {
 }
 
 function sobaImaVodniStevec(soba) {
-  const tipHise = String(soba?.tip_hise ?? '').toLowerCase();
-  if (tipHise === 'velika') return true;
-  if (tipHise === 'stara') return false;
   return Boolean(soba?.voda_stanje);
 }
 

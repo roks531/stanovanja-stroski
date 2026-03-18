@@ -59,7 +59,7 @@ export default function DialogPodrobnostiObracuna({
             <StrosekVrstica label="Najemnina" vrednost={denar(izbranRacun.najemnina)} />
             <StrosekVrstica label="Skupni stroški" vrednost={denar(izbranRacun.strosek_skupni)} />
             <StrosekVrstica label="NetTV" vrednost={denar(izbranRacun.strosek_neta)} />
-            <StrosekVrstica label="Fiksni" vrednost={denar(izbranRacun.strosek_tv)} />
+            <StrosekVrstica label="Drugo" vrednost={denar(izbranRacun.strosek_tv)} />
             <StrosekVrstica label="Ogrevanje" vrednost={denar(izbranRacun.strosek_ogrevanja)} />
             <StrosekVrstica
               label="Elektrika"

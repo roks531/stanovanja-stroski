@@ -507,7 +507,7 @@ export default function ObracuniSekcija({
                     {poljeDenar('strosek_neta', 'NetTV', rocniObracun.strosek_neta)}
                   </Box>
                   <Box sx={{ flex: '1 1 200px', minWidth: 180 }}>
-                    {poljeDenar('strosek_tv', 'Fiksni strošek', rocniObracun.strosek_tv)}
+                    {poljeDenar('strosek_tv', 'Drugo', rocniObracun.strosek_tv)}
                   </Box>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
