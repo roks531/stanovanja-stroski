@@ -28,3 +28,8 @@ pnpm-debug.log*
 coverage/
 tmp/
 *.tmp
+
+# Local WIP (not ready to commit yet)
+src/komponente/admin-pogled/StatistikaSekcija.jsx
+.codex
+.codex/

@@ -291,7 +291,9 @@ export default function NajemnikPogled() {
     const strosekSkupni = Number(trenutno?.strosekSkupni ?? paket.soba.strosek_skupni ?? 0);
     const strosekNeta = Number(trenutno?.strosekNeta ?? paket.soba.nettv ?? paket.soba.strosek_neta ?? 0);
     const strosekTv = Number(trenutno?.strosekTv ?? paket.soba.fiksni ?? paket.soba.strosek_tv ?? 0);
-    const strosekOgrevanja = Number(trenutno?.strosekOgrevanja ?? paket.strosekOgrevanja ?? 0);
+    const strosekOgrevanja = Number(
+      izbranoObdobjeVnosa?.strosek_ogrevanja ?? trenutno?.strosekOgrevanja ?? paket.strosekOgrevanja ?? 0
+    );
 
     const imaVnosElektrike =
       vnosStevca.stanje_elektrike !== '' && Number.isFinite(predogledStevca.novoElektrike);
@@ -327,7 +329,7 @@ export default function NajemnikPogled() {
       strosekVode,
       skupaj: Number(skupaj.toFixed(2))
     };
-  }, [paket, izbranaCena, trenutno, predogledStevca, vnosStevca, imaVodniStevec]);
+  }, [paket, izbranaCena, trenutno, predogledStevca, vnosStevca, imaVodniStevec, izbranoObdobjeVnosa]);
 
   const vrsticePlacila = useMemo(
     () =>

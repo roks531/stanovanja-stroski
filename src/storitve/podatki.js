@@ -369,6 +369,12 @@ async function pripraviObdobjaZaVnosNajemnika({ uporabnik, uporabnikId, soba, pl
       ? odprtiKandidati
       : (dovoljeniKandidati.length > 0 ? [dovoljeniKandidati[0]] : []);
 
+  const { data: sobeTipa, error: napakaSobeTipa } = await supabase
+    .from('sobe')
+    .select('id, faktor_ogrevanja')
+    .eq('tip_hise', soba.tip_hise);
+  if (napakaSobeTipa) throw new Error(napakaSobeTipa.message);
+
   const obdobjaZaVnos = await Promise.all(
     uporabljeniKandidati.map(async ({ mesec, leto }) => {
       const placilo = najdiPlaciloZaObdobje(placila, mesec, leto);
@@ -394,11 +400,22 @@ async function pripraviObdobjaZaVnosNajemnika({ uporabnik, uporabnikId, soba, pl
         );
 
       const obdobjeOgrevanja = obdobjeOgrevanjaZaObracun(mesec, leto);
-      const ogrevanjePripravljeno = await obstajaOgrevanjeZaTipObdobje(
-        soba.tip_hise,
-        obdobjeOgrevanja.mesec,
-        obdobjeOgrevanja.leto
-      );
+      const { data: ogrevanjePoTipu, error: napakaOgrevanjePoTipu } = await supabase
+        .from('ogrevanje_tipi')
+        .select('znesek')
+        .eq('tip_hise', soba.tip_hise)
+        .eq('mesec', obdobjeOgrevanja.mesec)
+        .eq('leto', obdobjeOgrevanja.leto)
+        .maybeSingle();
+      if (napakaOgrevanjePoTipu) throw new Error(napakaOgrevanjePoTipu.message);
+
+      const ogrevanjePripravljeno = ogrevanjePoTipu?.znesek != null;
+      const razdelitevOgrevanja = ogrevanjePripravljeno
+        ? razdeliOgrevanjePoSobah(ogrevanjePoTipu.znesek, sobeTipa ?? [])
+        : null;
+      const strosekOgrevanja = ogrevanjePripravljeno
+        ? Number(razdelitevOgrevanja?.get(soba.id) ?? 0)
+        : 0;
 
       return {
         mesec,
@@ -420,6 +437,7 @@ async function pripraviObdobjaZaVnosNajemnika({ uporabnik, uporabnikId, soba, pl
             ),
         prejsnje_stanje_elektrike: Number(prejsnjeStanjeElektrike ?? 0),
         prejsnje_stanje_vode: prejsnjeStanjeVode == null ? null : Number(prejsnjeStanjeVode),
+        strosek_ogrevanja: strosekOgrevanja,
         ogrevanjePripravljeno,
         sporociloZaklepaOgrevanja: ogrevanjePripravljeno
           ? ''
@@ -535,34 +553,14 @@ export async function pridobiNajemnikPodatke(uporabnikId) {
   });
 
   const obdobjeZaVnos = privzetoObdobje ?? trenutniMesecLeto();
+  const privzetiVnos = (obdobjaZaVnos ?? []).find(
+    (obdobje) =>
+      Number(obdobje.mesec) === Number(obdobjeZaVnos.mesec) &&
+      Number(obdobje.leto) === Number(obdobjeZaVnos.leto)
+  ) ?? null;
   const obdobjeOgrevanja = obdobjeOgrevanjaZaObracun(obdobjeZaVnos.mesec, obdobjeZaVnos.leto);
-  let strosekOgrevanja = Number(soba.strosek_ogrevanja ?? 0);
-  let ogrevanjePripravljeno = false;
-
-  const { data: ogrevanjePoTipu, error: napakaOgrevanjePoTipu } = await supabase
-    .from('ogrevanje_tipi')
-    .select('znesek, mesec, leto')
-    .eq('tip_hise', soba.tip_hise)
-    .eq('mesec', obdobjeOgrevanja.mesec)
-    .eq('leto', obdobjeOgrevanja.leto)
-    .maybeSingle();
-
-  if (napakaOgrevanjePoTipu) throw new Error(napakaOgrevanjePoTipu.message);
-
-  if (ogrevanjePoTipu?.znesek != null) {
-    ogrevanjePripravljeno = true;
-    const { data: sobeTipa, error: napakaSobeTipa } = await supabase
-      .from('sobe')
-      .select('id, faktor_ogrevanja')
-      .eq('tip_hise', soba.tip_hise);
-
-    if (napakaSobeTipa) throw new Error(napakaSobeTipa.message);
-
-    const razdelitev = razdeliOgrevanjePoSobah(ogrevanjePoTipu.znesek, sobeTipa ?? []);
-    strosekOgrevanja = Number(razdelitev.get(soba.id) ?? soba.strosek_ogrevanja ?? 0);
-  } else {
-    strosekOgrevanja = 0;
-  }
+  const strosekOgrevanja = Number(privzetiVnos?.strosek_ogrevanja ?? 0);
+  const ogrevanjePripravljeno = privzetiVnos?.ogrevanjePripravljeno === true;
 
   return {
     soba,
