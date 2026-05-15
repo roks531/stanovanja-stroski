@@ -181,19 +181,11 @@ async function pridobiNajemnikoveOsnovnePodatke(uporabnikId) {
 
 function izracunajZacetnoObdobjeUporabnika(uporabnik) {
   const zacetekUporabnikOd = uporabnik?.uporabnik_od ? dayjs(uporabnik.uporabnik_od) : null;
-  const zacetekPogodbaOd = uporabnik?.pogodba_od ? dayjs(uporabnik.pogodba_od) : null;
   const uporabnikOdVeljaven = Boolean(zacetekUporabnikOd?.isValid());
-  const pogodbaOdVeljaven = Boolean(zacetekPogodbaOd?.isValid());
-
-  if (!uporabnikOdVeljaven && !pogodbaOdVeljaven) return null;
-  const izhodiisce = !uporabnikOdVeljaven
-    ? zacetekPogodbaOd
-    : !pogodbaOdVeljaven
-      ? zacetekUporabnikOd
-      : (zacetekPogodbaOd.isAfter(zacetekUporabnikOd) ? zacetekPogodbaOd : zacetekUporabnikOd);
+  if (!uporabnikOdVeljaven) return null;
 
   // Začetno stanje je baseline ob vselitvi, zato je prvo dovoljeno obdobje naslednji mesec.
-  return izhodiisce.startOf('month').add(1, 'month');
+  return zacetekUporabnikOd.startOf('month').add(1, 'month');
 }
 
 function jeObdobjeVsajOd(mesec, leto, dovoljenoOd) {
@@ -215,7 +207,7 @@ function najdiOdcitekZaObdobje(odcitki, mesec, leto) {
   ) ?? null;
 }
 
-// Najemnik ne sme oddajati obračuna pred svojim začetnim obdobjem (uporabnik_od/pogodba_od).
+// Najemnik ne sme oddajati obračuna pred svojim začetnim obdobjem (uporabnik_od).
 async function preveriNajemnikovoObdobjeVnosa(uporabnikId, mesec, leto) {
   let { data: uporabnik, error } = await supabase
     .from('uporabniki')
