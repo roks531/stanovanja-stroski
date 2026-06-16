@@ -1270,14 +1270,19 @@ const stolpciObracuni = [
     )
   },
 
-  // ── Datumi vnosa in plačila ────────────────────────────────────────
+  // ── Datumi vnosa in plačila (sortirano po datumu obračuna) ───────────
   {
     field: 'datum_placila_iso',
     headerName: 'Datumi',
     width: 130,
     editable: true,
-    sortable: false,
+    sortable: true,
     filterable: false,
+    sortComparator: (v1, v2, cellParams1, cellParams2) => {
+      const a = cellParams1.api.getRow(cellParams1.id)?.datum_vnosa_iso;
+      const b = cellParams2.api.getRow(cellParams2.id)?.datum_vnosa_iso;
+      return dayjs(a ?? 0).valueOf() - dayjs(b ?? 0).valueOf();
+    },
     renderEditCell: (params) => <DatumPlacilaEditCelica {...params} />,
     renderCell: (params) => (
       <Stack spacing={0.3} py={0.4} sx={{ lineHeight: 1.2 }}>
