@@ -27,6 +27,8 @@ import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import AddCircleOutlineOutlinedIcon from '@mui/icons-material/AddCircleOutlineOutlined';
 import EuroSymbolOutlinedIcon from '@mui/icons-material/EuroSymbolOutlined';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import EditOffOutlinedIcon from '@mui/icons-material/EditOffOutlined';
 import SearchableSelect from '../SearchableSelect';
 import {
   ADMIN_DATAGRID_FLEKS_SX,
@@ -63,7 +65,9 @@ export default function ObracuniSekcija({
   obdelajPosodobitevObracuna,
   obdelajNapakoPosodobitveObracuna,
   jeCelicaObracunUredljiva,
-  izbrisiObracunVrstico
+  izbrisiObracunVrstico,
+  vrsticeObracunVUrejanju,
+  preklopiUrejanjeObracuna
 }) {
   const [dialogRocniObracunOdprt, setDialogRocniObracunOdprt] = useState(false);
   const [shranjujemRocniObracun, setShranjujemRocniObracun] = useState(false);
@@ -133,36 +137,55 @@ export default function ObracuniSekcija({
     const stolpecBrisanje = {
       field: 'akcije_obracun',
       headerName: '',
-      width: 56,
+      width: 88,
       sortable: false,
       filterable: false,
       disableColumnMenu: true,
       align: 'center',
       headerAlign: 'center',
       renderCell: (params) => {
-        if (params.row?.placano) return null;
+        const vUrejanju = vrsticeObracunVUrejanju?.has(params.row?.id);
         return (
-          <Tooltip title="Izbriši odprt obračun">
-            <span>
-              <IconButton
-                size="small"
-                color="error"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  izbrisiObracunVrstico?.(params.row);
-                }}
-                aria-label="Izbriši obračun"
-              >
-                <DeleteOutlineOutlinedIcon sx={{ fontSize: 17 }} />
-              </IconButton>
-            </span>
-          </Tooltip>
+          <Stack direction="row" spacing={0.25}>
+            <Tooltip title={vUrejanju ? 'Zaključi urejanje' : 'Uredi obračun'}>
+              <span>
+                <IconButton
+                  size="small"
+                  color={vUrejanju ? 'primary' : 'default'}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    preklopiUrejanjeObracuna?.(params.row?.id);
+                  }}
+                  aria-label={vUrejanju ? 'Zaključi urejanje obračuna' : 'Uredi obračun'}
+                >
+                  {vUrejanju ? <EditOffOutlinedIcon sx={{ fontSize: 17 }} /> : <EditOutlinedIcon sx={{ fontSize: 17 }} />}
+                </IconButton>
+              </span>
+            </Tooltip>
+            {!params.row?.placano && (
+              <Tooltip title="Izbriši odprt obračun">
+                <span>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      izbrisiObracunVrstico?.(params.row);
+                    }}
+                    aria-label="Izbriši obračun"
+                  >
+                    <DeleteOutlineOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
+          </Stack>
         );
       }
     };
 
     return [...stolpciObracuni, stolpecBrisanje];
-  }, [stolpciObracuni, izbrisiObracunVrstico]);
+  }, [stolpciObracuni, izbrisiObracunVrstico, vrsticeObracunVUrejanju, preklopiUrejanjeObracuna]);
 
   function pripraviPrivzetiRocniObracun() {
     const danes = new Date();

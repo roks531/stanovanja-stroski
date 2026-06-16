@@ -10,6 +10,8 @@
  *   2 – Cene elektrike in vode
  *   3 – Ogrevanje
  *   4 – Obračuni najemnikov
+ *   5 – Obvestila
+ *   6 – Stroški
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Box, Typography } from '@mui/material';
@@ -20,6 +22,7 @@ import ElectricBoltOutlinedIcon from '@mui/icons-material/ElectricBoltOutlined';
 import WhatshotOutlinedIcon from '@mui/icons-material/WhatshotOutlined';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
+import RequestQuoteOutlinedIcon from '@mui/icons-material/RequestQuoteOutlined';
 import dayjs from 'dayjs';
 import { useAvtentikacija } from '../kontekst/AvtentikacijaKontekst';
 import AppLayout from './AppLayout';
@@ -28,6 +31,7 @@ import SobeSekcija from './admin-pogled/SobeSekcija';
 import CeneStevciSekcija from './admin-pogled/CeneStevciSekcija';
 import OgrevanjeSekcija from './admin-pogled/OgrevanjeSekcija';
 import ObracuniSekcija from './admin-pogled/ObracuniSekcija';
+import StrokiSekcija from './admin-pogled/StrokiSekcija';
 import ObvestilaSekcija from './admin-pogled/ObvestilaSekcija';
 import AdminDialogi from './admin-pogled/AdminDialogi';
 import PotrditveniDialog from './PotrditveniDialog';
@@ -45,6 +49,7 @@ import {
   stolpciAdminStevci,
   stolpciOgrevanjeTipi,
   stolpciObracuni,
+  stolpciStroski,
   kljucObracuna,
   normalizirajOznakoSobe,
   moznostiStrani,
@@ -57,6 +62,8 @@ import {
   izbrisiUporabnikaZAuth as izbrisiUporabnikaZAuthStoritev,
   dodajCeno,
   izbrisiCeno as izbrisiCenoStoritev,
+  dodajStrosek as dodajStrosekStoritev,
+  izbrisiStrosek as izbrisiStrosekStoritev,
   izbrisiOgrevanjeTip as izbrisiOgrevanjeTipStoritev,
   izbrisiObracun as izbrisiObracunStoritev,
   shraniSobo as shraniSoboStoritev,
@@ -72,7 +79,7 @@ import {
 
 const KLJUC_ADMIN_TAB = 'stanovanja_admin_tab';
 const KLJUC_ADMIN_CENE_STEVCI_PODTAB = 'stanovanja_admin_cene_stevci_podtab';
-const DOVOLJENI_ADMIN_TABI = [0, 1, 2, 3, 4, 5];
+const DOVOLJENI_ADMIN_TABI = [0, 1, 2, 3, 4, 5, 6];
 
 function preberiStevilkoIzStorage(kljuc, privzeto, dovoljeneVrednosti) {
   if (typeof window === 'undefined') return privzeto;
@@ -113,7 +120,8 @@ export default function AdminPogled() {
     cene: [],
     ogrevanjeTipi: [],
     odcitki: [],
-    placila: []
+    placila: [],
+    stroski: []
   });
   const privzetoObdobje = prejsnjiMesecLeto();
 
@@ -208,6 +216,7 @@ export default function AdminPogled() {
   });
   const [dialogPotrdiVse, setDialogPotrdiVse] = useState({ odprt: false, stevilo: 0, ids: [] });
   const [obdelujemPotrdiVse, setObdelujemPotrdiVse] = useState(false);
+  const [vrsticeObracunVUrejanju, setVrsticeObracunVUrejanju] = useState(() => new Set());
   const [filterStevciSoba, setFilterStevciSoba] = useState('');
   const [novStevecAdmin, setNovStevecAdmin] = useState({
     id: '',
@@ -607,6 +616,22 @@ export default function AdminPogled() {
       je_povezana_z_obracuni: false,
       se_lahko_brise: true
     }));
+  }, [podatki]);
+
+  const vrsticeStroski = useMemo(() => {
+    const sobePoId = new Map((podatki.sobe ?? []).map((s) => [s.id, s]));
+    return (podatki.stroski ?? []).map((s) => {
+      const soba = s.soba_id ? sobePoId.get(s.soba_id) : null;
+      return {
+        id: s.id,
+        strosek: s.strosek,
+        soba: soba?.ime_sobe ?? null,
+        soba_id: s.soba_id ?? '',
+        tip_hise: s.tip_hise ?? soba?.tip_hise ?? null,
+        znesek: Number(s.znesek ?? 0),
+        ustvarjeno_ob_format: s.ustvarjeno_ob ? dayjs(s.ustvarjeno_ob).format('DD.MM.YYYY') : '—'
+      };
+    });
   }, [podatki]);
 
   const vrsticeOgrevanjeTipi = useMemo(
@@ -1233,6 +1258,68 @@ export default function AdminPogled() {
     }
   }
 
+  async function dodajStrosek(vnos) {
+    setNapaka('');
+    setObvestilo('');
+
+    const strosek = String(vnos?.strosek ?? '').trim();
+    const znesek = Number(vnos?.znesek);
+
+    if (!strosek) {
+      const sporocilo = 'Strošek je obvezen.';
+      setNapaka(sporocilo);
+      throw new Error(sporocilo);
+    }
+    if (!Number.isFinite(znesek) || znesek < 0) {
+      const sporocilo = 'Znesek mora biti 0 ali več.';
+      setNapaka(sporocilo);
+      throw new Error(sporocilo);
+    }
+
+    try {
+      await dodajStrosekStoritev(
+        {
+          id: vnos?.id || undefined,
+          strosek,
+          tip_hise: vnos?.tip_hise || null,
+          soba_id: vnos?.soba_id || null,
+          znesek
+        },
+        seja.user.id
+      );
+      await nalozi({ prikaziNalaganje: false, vrziNapako: true });
+      setObvestilo(vnos?.id ? 'Strošek je uspešno posodobljen.' : 'Strošek je uspešno dodan.');
+    } catch (err) {
+      const sporocilo = err?.message || 'Stroška ni bilo mogoče shraniti.';
+      setNapaka(sporocilo);
+      throw new Error(sporocilo);
+    }
+  }
+
+  async function izbrisiStrosekVrstico(vrstica) {
+    setNapaka('');
+    setObvestilo('');
+
+    if (!vrstica?.id) return;
+
+    const potrjeno = await odpriDialogBrisanja({
+      naslov: 'Izbriši strošek?',
+      sporocilo: `Ali res želiš izbrisati strošek (${vrstica.strosek})?`
+    });
+    if (!potrjeno) return;
+
+    try {
+      setObdelujemBrisanje(true);
+      await izbrisiStrosekStoritev(vrstica.id);
+      await nalozi({ prikaziNalaganje: true, vrziNapako: true });
+      setObvestilo('Strošek je uspešno izbrisan.');
+    } catch (err) {
+      setNapaka(String(err?.message ?? '') || 'Stroška ni bilo mogoče izbrisati.');
+    } finally {
+      setObdelujemBrisanje(false);
+    }
+  }
+
   async function izbrisiObracunVrstico(vrstica) {
     setNapaka('');
     setObvestilo('');
@@ -1551,6 +1638,7 @@ export default function AdminPogled() {
   }
 
   function jeCelicaObracunUredljiva(params) {
+    if (!vrsticeObracunVUrejanju.has(params?.row?.id)) return false;
     const imaOdcitek = Boolean(params?.row?.odcitek_id);
     if (params.field === 'stanje_elektrike') return imaOdcitek;
     if (params.field === 'stanje_vode') {
@@ -1565,6 +1653,18 @@ export default function AdminPogled() {
       'placano',
       'datum_placila_iso'
     ].includes(params.field);
+  }
+
+  function preklopiUrejanjeObracuna(rowId) {
+    setVrsticeObracunVUrejanju((prej) => {
+      const novo = new Set(prej);
+      if (novo.has(rowId)) {
+        novo.delete(rowId);
+      } else {
+        novo.add(rowId);
+      }
+      return novo;
+    });
   }
 
   async function obdelajPosodobitevObracuna(novaVrstica, staraVrstica) {
@@ -2165,6 +2265,29 @@ export default function AdminPogled() {
     );
   }
 
+  function izvoziStrokiXlsx() {
+    const vrstice = (vrsticeStroski ?? []).map((s) => ({
+      strosek: s.strosek ?? '',
+      hisa: s.tip_hise ?? '',
+      soba: s.soba ?? '',
+      znesek: Number(s.znesek ?? 0),
+      datum: s.ustvarjeno_ob_format && s.ustvarjeno_ob_format !== '—' ? s.ustvarjeno_ob_format : ''
+    }));
+
+    izvoziXlsx(
+      `stroski-${dayjs().format('YYYY-MM-DD_HH-mm')}.xlsx`,
+      'Stroski',
+      [
+        { key: 'strosek', label: 'Strosek' },
+        { key: 'hisa', label: 'Hisa' },
+        { key: 'soba', label: 'Soba' },
+        { key: 'znesek', label: 'Znesek (EUR)' },
+        { key: 'datum', label: 'Datum vnosa' }
+      ],
+      vrstice
+    );
+  }
+
   // ── Konfiguracija stranskega menija – navigacijske točke ──
   const navigacijaAdmin = [
     { id: 0, label: 'Uporabniki', ikona: <PeopleOutlinedIcon /> },
@@ -2173,6 +2296,7 @@ export default function AdminPogled() {
     { id: 3, label: 'Ogrevanje', ikona: <WhatshotOutlinedIcon /> },
     { id: 4, label: 'Obračuni', ikona: <ReceiptLongOutlinedIcon /> },
     { id: 5, label: 'Obvestila', ikona: <CampaignOutlinedIcon /> },
+    { id: 6, label: 'Stroški', ikona: <RequestQuoteOutlinedIcon /> },
   ];
 
   // Ime prijavljenega admina za glavo stranskega menija
@@ -2335,6 +2459,8 @@ export default function AdminPogled() {
           obdelajNapakoPosodobitveObracuna={obdelajNapakoPosodobitveObracuna}
           jeCelicaObracunUredljiva={jeCelicaObracunUredljiva}
           izbrisiObracunVrstico={izbrisiObracunVrstico}
+          vrsticeObracunVUrejanju={vrsticeObracunVUrejanju}
+          preklopiUrejanjeObracuna={preklopiUrejanjeObracuna}
         />
       )}
 
@@ -2342,6 +2468,20 @@ export default function AdminPogled() {
         <ObvestilaSekcija
           podatkiSobe={podatki.sobe}
           ustvarilId={seja?.user?.id}
+        />
+      )}
+
+      {!nalaganje && tab === 6 && (
+        <StrokiSekcija
+          vrsticeStroski={vrsticeStroski}
+          izvoziStrokiXlsx={izvoziStrokiXlsx}
+          dodajStrosek={dodajStrosek}
+          izbrisiStrosekVrstico={izbrisiStrosekVrstico}
+          podatkiSobe={podatki.sobe}
+          tipiHise={tipiHise}
+          stolpciStroski={stolpciStroski}
+          moznostiStrani={moznostiStrani}
+          lokalizacijaMreze={lokalizacijaMreze}
         />
       )}
 

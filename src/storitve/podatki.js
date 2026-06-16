@@ -1184,7 +1184,7 @@ export async function pridobiAdminPodatke() {
       .order('uporabnik_od', { ascending: false });
   }
 
-  const [sobeRes, ceneRes, ogrevanjeTipiRes, odcitkiRes, placilaRes] = await Promise.all([
+  const [sobeRes, ceneRes, ogrevanjeTipiRes, odcitkiRes, placilaRes, strokiRes] = await Promise.all([
     supabase
       .from('sobe')
       .select('*')
@@ -1207,7 +1207,11 @@ export async function pridobiAdminPodatke() {
       .from('placila')
       .select('*')
       .order('leto', { ascending: false })
-      .order('mesec', { ascending: false })
+      .order('mesec', { ascending: false }),
+    supabase
+      .from('stroski')
+      .select('*')
+      .order('ustvarjeno_ob', { ascending: false })
   ]);
 
   if (uporabnikiRes.error) throw new Error(uporabnikiRes.error.message);
@@ -1216,6 +1220,7 @@ export async function pridobiAdminPodatke() {
   if (ogrevanjeTipiRes.error) throw new Error(ogrevanjeTipiRes.error.message);
   if (odcitkiRes.error) throw new Error(odcitkiRes.error.message);
   if (placilaRes.error) throw new Error(placilaRes.error.message);
+  if (strokiRes.error) throw new Error(strokiRes.error.message);
 
   return {
     uporabniki: uporabnikiRes.data,
@@ -1223,7 +1228,8 @@ export async function pridobiAdminPodatke() {
     cene: ceneRes.data,
     ogrevanjeTipi: ogrevanjeTipiRes.data,
     odcitki: odcitkiRes.data,
-    placila: placilaRes.data
+    placila: placilaRes.data,
+    stroski: strokiRes.data
   };
 }
 
@@ -1649,6 +1655,46 @@ export async function izbrisiCeno(cenaId) {
     .from('cene')
     .delete()
     .eq('id', cenaId);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function dodajStrosek(vrednosti, ustvaril) {
+  if (vrednosti.id) {
+    const { id, ...ostalo } = vrednosti;
+    const { data, error } = await supabase
+      .from('stroski')
+      .update(ostalo)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from('stroski')
+    .insert({
+      ...vrednosti,
+      ustvaril: ustvaril ?? null
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  return data;
+}
+
+export async function izbrisiStrosek(strosekId) {
+  if (!strosekId) throw new Error('Strošek ni določen.');
+
+  const { error } = await supabase
+    .from('stroski')
+    .delete()
+    .eq('id', strosekId);
 
   if (error) throw new Error(error.message);
 }

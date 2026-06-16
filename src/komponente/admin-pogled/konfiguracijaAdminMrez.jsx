@@ -687,6 +687,92 @@ const stolpciCene = [
   }
 ];
 
+const stolpciStroski = [
+  // ── Strošek (opis) ────────────────────────────────────────────
+  {
+    field: 'strosek',
+    headerName: 'Strošek',
+    width: 240,
+    flex: 1,
+    renderCell: (params) => (
+      <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+        <Typography sx={{ fontSize: '0.82rem', fontWeight: 600 }} noWrap>
+          {params.value}
+        </Typography>
+      </Box>
+    )
+  },
+
+  // ── Soba / Hiša ───────────────────────────────────────────────
+  {
+    field: 'soba',
+    headerName: 'Soba / Hiša',
+    width: 150,
+    renderCell: (params) => (
+      <Stack spacing={0.25} py={0.25}>
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <HomeOutlinedIcon sx={{ fontSize: 12, color: 'text.disabled', flexShrink: 0 }} />
+          <Typography variant="caption" fontWeight={700} noWrap>
+            {params.row.soba ?? 'Splošno'}
+          </Typography>
+        </Stack>
+        {params.row.tip_hise && (
+          <Typography
+            sx={{
+              fontSize: '0.67rem',
+              fontWeight: 600,
+              color: '#64748b',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em'
+            }}
+            noWrap
+          >
+            {params.row.tip_hise}
+          </Typography>
+        )}
+      </Stack>
+    )
+  },
+
+  // ── Znesek ────────────────────────────────────────────────────
+  {
+    field: 'znesek',
+    headerName: 'Znesek',
+    width: 130,
+    align: 'center',
+    headerAlign: 'center',
+    renderCell: (params) => (
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <EuroSymbolOutlinedIcon sx={{ fontSize: 13, color: '#059669', flexShrink: 0 }} />
+          <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: '#059669' }}>
+            {Number(params.value ?? 0).toFixed(2)}
+          </Typography>
+        </Stack>
+      </Box>
+    )
+  },
+
+  // ── Datum vnosa ───────────────────────────────────────────────
+  {
+    field: 'ustvarjeno_ob_format',
+    headerName: 'Datum',
+    width: 120,
+    align: 'center',
+    headerAlign: 'center',
+    renderCell: (params) => (
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <CalendarTodayOutlinedIcon sx={{ fontSize: 12, color: '#94a3b8', flexShrink: 0 }} />
+          <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: '#374151' }}>
+            {params.value ?? '—'}
+          </Typography>
+        </Stack>
+      </Box>
+    )
+  }
+];
+
 const stolpciAdminStevci = [
   // ── Soba / Hiša – kombinirana celica (enako kot v obračunih) ──
   {
@@ -1380,6 +1466,7 @@ export {
   sobaImaVodniStevec,
   stolpciSobe,
   stolpciCene,
+  stolpciStroski,
   stolpciAdminStevci,
   stolpciOgrevanjeTipi,
   stolpciObracuni,
