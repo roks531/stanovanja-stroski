@@ -14,6 +14,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import BoltOutlinedIcon from '@mui/icons-material/BoltOutlined';
 import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
 import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
+import SellOutlinedIcon from '@mui/icons-material/SellOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
@@ -687,27 +688,14 @@ const stolpciCene = [
   }
 ];
 
+// stolpciStroski does NOT include the 'strosek' and 'opis' columns — those are
+// built dynamically in StrokiSekcija so they can carry click-handler state.
 const stolpciStroski = [
-  // ── Strošek (opis) ────────────────────────────────────────────
-  {
-    field: 'strosek',
-    headerName: 'Strošek',
-    width: 240,
-    flex: 1,
-    renderCell: (params) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-        <Typography sx={{ fontSize: '0.82rem', fontWeight: 600 }} noWrap>
-          {params.value}
-        </Typography>
-      </Box>
-    )
-  },
-
   // ── Soba / Hiša ───────────────────────────────────────────────
   {
     field: 'soba',
     headerName: 'Soba / Hiša',
-    width: 150,
+    width: 140,
     renderCell: (params) => (
       <Stack spacing={0.25} py={0.25}>
         <Stack direction="row" spacing={0.5} alignItems="center">
@@ -738,7 +726,7 @@ const stolpciStroski = [
   {
     field: 'znesek',
     headerName: 'Znesek',
-    width: 130,
+    width: 120,
     align: 'center',
     headerAlign: 'center',
     renderCell: (params) => (
@@ -753,22 +741,39 @@ const stolpciStroski = [
     )
   },
 
-  // ── Datum vnosa ───────────────────────────────────────────────
+  // ── Datum stroška + vnos (kombinirano) ───────────────────────
   {
-    field: 'ustvarjeno_ob_format',
+    field: 'datum_stroska',
     headerName: 'Datum',
-    width: 120,
+    width: 130,
     align: 'center',
     headerAlign: 'center',
+    // sort on raw ISO date so ordering is correct
+    sortComparator: (v1, v2) => {
+      if (!v1 && !v2) return 0;
+      if (!v1) return 1;
+      if (!v2) return -1;
+      return v1 < v2 ? -1 : v1 > v2 ? 1 : 0;
+    },
     renderCell: (params) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Stack direction="row" spacing={0.5} alignItems="center">
-          <CalendarTodayOutlinedIcon sx={{ fontSize: 12, color: '#94a3b8', flexShrink: 0 }} />
-          <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: '#374151' }}>
-            {params.value ?? '—'}
+      <Stack spacing={0.25} alignItems="center" justifyContent="center" sx={{ height: '100%' }}>
+        {params.row.datum_stroska_format ? (
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <SellOutlinedIcon sx={{ fontSize: 11, color: '#059669', flexShrink: 0 }} />
+            <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#059669' }}>
+              {params.row.datum_stroska_format}
+            </Typography>
+          </Stack>
+        ) : (
+          <Typography sx={{ fontSize: '0.72rem', color: '#cbd5e1' }}>—</Typography>
+        )}
+        <Stack direction="row" spacing={0.4} alignItems="center">
+          <CalendarTodayOutlinedIcon sx={{ fontSize: 11, color: '#cbd5e1', flexShrink: 0 }} />
+          <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+            {params.row.ustvarjeno_ob_format ?? ''}
           </Typography>
         </Stack>
-      </Box>
+      </Stack>
     )
   }
 ];

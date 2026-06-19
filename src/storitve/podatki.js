@@ -1210,7 +1210,7 @@ export async function pridobiAdminPodatke() {
       .order('mesec', { ascending: false }),
     supabase
       .from('stroski')
-      .select('*')
+      .select('*, stroski_postavke(id, opis, znesek, vrstni_red)')
       .order('ustvarjeno_ob', { ascending: false })
   ]);
 
@@ -1660,13 +1660,15 @@ export async function izbrisiCeno(cenaId) {
 }
 
 export async function dodajStrosek(vrednosti, ustvaril) {
-  if (vrednosti.id) {
-    const { id, ...ostalo } = vrednosti;
+  const { postavke, ...poljaStroska } = vrednosti;
+
+  if (poljaStroska.id) {
+    const { id, ...ostalo } = poljaStroska;
     const { data, error } = await supabase
       .from('stroski')
       .update(ostalo)
       .eq('id', id)
-      .select()
+      .select('*, stroski_postavke(id, opis, znesek, vrstni_red)')
       .single();
 
     if (error) throw new Error(error.message);
@@ -1677,15 +1679,46 @@ export async function dodajStrosek(vrednosti, ustvaril) {
   const { data, error } = await supabase
     .from('stroski')
     .insert({
-      ...vrednosti,
+      ...poljaStroska,
       ustvaril: ustvaril ?? null
     })
-    .select()
+    .select('*, stroski_postavke(id, opis, znesek, vrstni_red)')
     .single();
 
   if (error) throw new Error(error.message);
 
   return data;
+}
+
+export async function shraniStrosekPostavke(strosekId, postavke) {
+  if (!strosekId) throw new Error('Strošek ni določen.');
+
+  const { error: napakaBrisanja } = await supabase
+    .from('stroski_postavke')
+    .delete()
+    .eq('strosek_id', strosekId);
+
+  if (napakaBrisanja) throw new Error(napakaBrisanja.message);
+
+  if (!postavke || postavke.length === 0) return [];
+
+  const vrstice = postavke.map((p, i) => ({
+    strosek_id: strosekId,
+    opis: String(p.opis ?? '').trim(),
+    znesek: Number(p.znesek ?? 0),
+    vrstni_red: i
+  })).filter((p) => p.opis);
+
+  if (vrstice.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('stroski_postavke')
+    .insert(vrstice)
+    .select();
+
+  if (error) throw new Error(error.message);
+
+  return data ?? [];
 }
 
 export async function izbrisiStrosek(strosekId) {
@@ -1695,6 +1728,71 @@ export async function izbrisiStrosek(strosekId) {
     .from('stroski')
     .delete()
     .eq('id', strosekId);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function pridobiAdminBelezke() {
+  const { data, error } = await supabase
+    .from('belezke')
+    .select('*')
+    .order('ustvarjeno_ob', { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function dodajBelezko(vrednosti, ustvaril) {
+  if (vrednosti.id) {
+    const { id, ...ostalo } = vrednosti;
+    const { data, error } = await supabase
+      .from('belezke')
+      .update(ostalo)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from('belezke')
+    .insert({ ...vrednosti, ustvaril: ustvaril ?? null })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function izbrisiBelezko(belezkaId) {
+  if (!belezkaId) throw new Error('Beležka ni določena.');
+
+  const { error } = await supabase
+    .from('belezke')
+    .delete()
+    .eq('id', belezkaId);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function izbrisiVseBelezke() {
+  const { error } = await supabase
+    .from('belezke')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+
+  if (error) throw new Error(error.message);
+}
+
+export async function izbrisiIzbraneBelezke(ids) {
+  if (!ids?.length) return;
+
+  const { error } = await supabase
+    .from('belezke')
+    .delete()
+    .in('id', ids);
 
   if (error) throw new Error(error.message);
 }

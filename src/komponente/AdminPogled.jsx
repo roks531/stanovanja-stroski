@@ -12,6 +12,7 @@
  *   4 – Obračuni najemnikov
  *   5 – Obvestila
  *   6 – Stroški
+ *   7 – Beležke
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Box, Typography } from '@mui/material';
@@ -23,6 +24,7 @@ import WhatshotOutlinedIcon from '@mui/icons-material/WhatshotOutlined';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import RequestQuoteOutlinedIcon from '@mui/icons-material/RequestQuoteOutlined';
+import StickyNote2OutlinedIcon from '@mui/icons-material/StickyNote2Outlined';
 import dayjs from 'dayjs';
 import { useAvtentikacija } from '../kontekst/AvtentikacijaKontekst';
 import AppLayout from './AppLayout';
@@ -33,6 +35,7 @@ import OgrevanjeSekcija from './admin-pogled/OgrevanjeSekcija';
 import ObracuniSekcija from './admin-pogled/ObracuniSekcija';
 import StrokiSekcija from './admin-pogled/StrokiSekcija';
 import ObvestilaSekcija from './admin-pogled/ObvestilaSekcija';
+import BelezkeSekcija from './admin-pogled/BelezkeSekcija';
 import AdminDialogi from './admin-pogled/AdminDialogi';
 import PotrditveniDialog from './PotrditveniDialog';
 import {
@@ -63,6 +66,7 @@ import {
   dodajCeno,
   izbrisiCeno as izbrisiCenoStoritev,
   dodajStrosek as dodajStrosekStoritev,
+  shraniStrosekPostavke,
   izbrisiStrosek as izbrisiStrosekStoritev,
   izbrisiOgrevanjeTip as izbrisiOgrevanjeTipStoritev,
   izbrisiObracun as izbrisiObracunStoritev,
@@ -622,13 +626,22 @@ export default function AdminPogled() {
     const sobePoId = new Map((podatki.sobe ?? []).map((s) => [s.id, s]));
     return (podatki.stroski ?? []).map((s) => {
       const soba = s.soba_id ? sobePoId.get(s.soba_id) : null;
+      const postavke = Array.isArray(s.stroski_postavke) ? s.stroski_postavke : [];
+      const znesekIzPostavk = postavke.length > 0
+        ? postavke.reduce((vsota, p) => vsota + Number(p.znesek ?? 0), 0)
+        : null;
       return {
         id: s.id,
         strosek: s.strosek,
+        opis: s.opis ?? '',
         soba: soba?.ime_sobe ?? null,
         soba_id: s.soba_id ?? '',
         tip_hise: s.tip_hise ?? soba?.tip_hise ?? null,
-        znesek: Number(s.znesek ?? 0),
+        znesek: znesekIzPostavk !== null ? znesekIzPostavk : Number(s.znesek ?? 0),
+        znesek_rocni: znesekIzPostavk !== null ? null : Number(s.znesek ?? 0),
+        datum_stroska: s.datum_stroska ?? null,
+        datum_stroska_format: s.datum_stroska ? dayjs(s.datum_stroska).format('DD.MM.YYYY') : null,
+        postavke,
         ustvarjeno_ob_format: s.ustvarjeno_ob ? dayjs(s.ustvarjeno_ob).format('DD.MM.YYYY') : '—'
       };
     });
@@ -1263,30 +1276,43 @@ export default function AdminPogled() {
     setObvestilo('');
 
     const strosek = String(vnos?.strosek ?? '').trim();
-    const znesek = Number(vnos?.znesek);
+    const postavke = Array.isArray(vnos?.postavke) ? vnos.postavke : [];
+    const imaPostavke = postavke.length > 0;
 
     if (!strosek) {
       const sporocilo = 'Strošek je obvezen.';
       setNapaka(sporocilo);
       throw new Error(sporocilo);
     }
-    if (!Number.isFinite(znesek) || znesek < 0) {
-      const sporocilo = 'Znesek mora biti 0 ali več.';
-      setNapaka(sporocilo);
-      throw new Error(sporocilo);
+
+    if (!imaPostavke) {
+      const znesek = Number(vnos?.znesek);
+      if (!Number.isFinite(znesek) || znesek < 0) {
+        const sporocilo = 'Znesek mora biti 0 ali več.';
+        setNapaka(sporocilo);
+        throw new Error(sporocilo);
+      }
     }
 
     try {
-      await dodajStrosekStoritev(
+      const znesekSkupaj = imaPostavke
+        ? postavke.reduce((vsota, p) => vsota + Number(p.znesek ?? 0), 0)
+        : Number(vnos?.znesek ?? 0);
+
+      const shranjen = await dodajStrosekStoritev(
         {
           id: vnos?.id || undefined,
           strosek,
+          opis: vnos?.opis?.trim() || null,
           tip_hise: vnos?.tip_hise || null,
           soba_id: vnos?.soba_id || null,
-          znesek
+          znesek: znesekSkupaj,
+          datum_stroska: vnos?.datum_stroska || null
         },
         seja.user.id
       );
+
+      await shraniStrosekPostavke(shranjen.id, imaPostavke ? postavke : []);
       await nalozi({ prikaziNalaganje: false, vrziNapako: true });
       setObvestilo(vnos?.id ? 'Strošek je uspešno posodobljen.' : 'Strošek je uspešno dodan.');
     } catch (err) {
@@ -2268,10 +2294,12 @@ export default function AdminPogled() {
   function izvoziStrokiXlsx() {
     const vrstice = (vrsticeStroski ?? []).map((s) => ({
       strosek: s.strosek ?? '',
+      opis: s.opis ?? '',
       hisa: s.tip_hise ?? '',
       soba: s.soba ?? '',
       znesek: Number(s.znesek ?? 0),
-      datum: s.ustvarjeno_ob_format && s.ustvarjeno_ob_format !== '—' ? s.ustvarjeno_ob_format : ''
+      datum_stroska: s.datum_stroska_format ?? '',
+      datum_vnosa: s.ustvarjeno_ob_format && s.ustvarjeno_ob_format !== '—' ? s.ustvarjeno_ob_format : ''
     }));
 
     izvoziXlsx(
@@ -2279,10 +2307,12 @@ export default function AdminPogled() {
       'Stroski',
       [
         { key: 'strosek', label: 'Strosek' },
+        { key: 'opis', label: 'Opis' },
         { key: 'hisa', label: 'Hisa' },
         { key: 'soba', label: 'Soba' },
         { key: 'znesek', label: 'Znesek (EUR)' },
-        { key: 'datum', label: 'Datum vnosa' }
+        { key: 'datum_stroska', label: 'Datum stroska' },
+        { key: 'datum_vnosa', label: 'Datum vnosa' }
       ],
       vrstice
     );
@@ -2297,6 +2327,7 @@ export default function AdminPogled() {
     { id: 4, label: 'Obračuni', ikona: <ReceiptLongOutlinedIcon /> },
     { id: 5, label: 'Obvestila', ikona: <CampaignOutlinedIcon /> },
     { id: 6, label: 'Stroški', ikona: <RequestQuoteOutlinedIcon /> },
+    { id: 7, label: 'Beležke', ikona: <StickyNote2OutlinedIcon /> },
   ];
 
   // Ime prijavljenega admina za glavo stranskega menija
@@ -2469,6 +2500,10 @@ export default function AdminPogled() {
           podatkiSobe={podatki.sobe}
           ustvarilId={seja?.user?.id}
         />
+      )}
+
+      {tab === 7 && (
+        <BelezkeSekcija ustvarilId={seja?.user?.id} />
       )}
 
       {!nalaganje && tab === 6 && (
