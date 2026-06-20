@@ -57,7 +57,12 @@ export default function PregledSekcija({
   potrdiObracun
 }) {
   const [dialogPotrditevOdprt, setDialogPotrditevOdprt] = useState(false);
+  const [dialogOpozorilOdprt, setDialogOpozorilOdprt] = useState(false);
+  const [opozorilnaVrstica, setOpozorilnaVrstica] = useState([]);
   const obdelavaPotrditve = shranjevanjeStevca || potrjevanjeObracuna;
+
+  const MEJA_OPOZORILO = 100;
+  const MEJA_BLOKADA = 500;
   const imenaMesecov = [
     'januar',
     'februar',
@@ -74,9 +79,46 @@ export default function PregledSekcija({
   ];
   const nazivObdobjaPotrditve = `${imenaMesecov[Number(vnosStevca.mesec) - 1] ?? String(vnosStevca.mesec)} ${vnosStevca.leto}`;
 
+  function odpriDialog() {
+    const vrstice = [];
+    if (predogledStevca.strosekElektrike > MEJA_BLOKADA) {
+      vrstice.push({ tip: 'blokada', vrsta: 'Elektrika', znesek: predogledStevca.strosekElektrike });
+    }
+    if (imaVodniStevec && predogledStevca.strosekVode > MEJA_BLOKADA) {
+      vrstice.push({ tip: 'blokada', vrsta: 'Voda', znesek: predogledStevca.strosekVode });
+    }
+
+    if (vrstice.length > 0) {
+      setOpozorilnaVrstica(vrstice);
+      setDialogOpozorilOdprt(true);
+      return;
+    }
+
+    const opozorila = [];
+    if (predogledStevca.strosekElektrike > MEJA_OPOZORILO) {
+      opozorila.push({ tip: 'opozorilo', vrsta: 'Elektrika', znesek: predogledStevca.strosekElektrike });
+    }
+    if (imaVodniStevec && predogledStevca.strosekVode > MEJA_OPOZORILO) {
+      opozorila.push({ tip: 'opozorilo', vrsta: 'Voda', znesek: predogledStevca.strosekVode });
+    }
+
+    if (opozorila.length > 0) {
+      setOpozorilnaVrstica(opozorila);
+      setDialogOpozorilOdprt(true);
+      return;
+    }
+
+    setDialogPotrditevOdprt(true);
+  }
+
   async function potrdiIzDialoga() {
     setDialogPotrditevOdprt(false);
     await potrdiObracun();
+  }
+
+  async function potrdiIzOpozorila() {
+    setDialogOpozorilOdprt(false);
+    setDialogPotrditevOdprt(true);
   }
 
   return (
@@ -296,7 +338,7 @@ export default function PregledSekcija({
                   variant="contained"
                   color="primary"
                   fullWidth
-                  onClick={() => setDialogPotrditevOdprt(true)}
+                  onClick={odpriDialog}
                   disabled={obdelavaPotrditve || jeOgrevanjeZaklenjeno || jeObdobjeZeOddano}
                   startIcon={obdelavaPotrditve ? <CircularProgress size={16} color="inherit" /> : null}
                 >
@@ -391,6 +433,58 @@ export default function PregledSekcija({
           <Button variant="contained" className="gumb-jeklo" onClick={potrdiIzDialoga} disabled={obdelavaPotrditve}>
             Potrdi
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog za nenavadne ali blokirane vrednosti */}
+      <Dialog
+        open={dialogOpozorilOdprt}
+        onClose={() => setDialogOpozorilOdprt(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: opozorilnaVrstica.some((v) => v.tip === 'blokada') ? 'error.main' : 'warning.main' }}>
+          {opozorilnaVrstica.some((v) => v.tip === 'blokada') ? 'Vnos ni mogoč' : 'Preverite vnesene vrednosti'}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={1.5}>
+            {opozorilnaVrstica.some((v) => v.tip === 'blokada') ? (
+              <>
+                <Typography>
+                  Vnesene vrednosti so nenavadno visoke in presegajo dovoljeno mejo. Prosimo, preverite odčitek in ga popravite.
+                </Typography>
+                {opozorilnaVrstica.map((v) => (
+                  <Alert key={v.vrsta} severity="error" sx={{ borderRadius: '6px' }}>
+                    <strong>{v.vrsta}:</strong> izračunani strošek je <strong>{denar(v.znesek)}</strong> — ta vrednost je nenavadno visoka. Preverite, ali ste pravilno vnesli stanje števca.
+                  </Alert>
+                ))}
+              </>
+            ) : (
+              <>
+                <Typography>
+                  Izračunani stroški niso v skladu z običajnimi vrednostmi. Prosimo, preverite, ali ste pravilno vnesli novo stanje števca.
+                </Typography>
+                {opozorilnaVrstica.map((v) => (
+                  <Alert key={v.vrsta} severity="warning" sx={{ borderRadius: '6px' }}>
+                    <strong>{v.vrsta}:</strong> izračunani strošek je <strong>{denar(v.znesek)}</strong> — ali ste prepričani, da je vnos pravilen?
+                  </Alert>
+                ))}
+                <Typography variant="body2" color="text.secondary">
+                  Če so podatki pravilni, lahko nadaljujete.
+                </Typography>
+              </>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogOpozorilOdprt(false)}>
+            Popravi vnos
+          </Button>
+          {!opozorilnaVrstica.some((v) => v.tip === 'blokada') && (
+            <Button variant="contained" color="warning" onClick={potrdiIzOpozorila}>
+              Da, podatki so pravilni
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Stack>
