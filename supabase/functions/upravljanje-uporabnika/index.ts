@@ -137,6 +137,27 @@ function jeNapakaManjkajocaKolonaZacetnihStanj(sporocilo: string | undefined) {
     (niz.includes('zacetno_stanje_elektrike') || niz.includes('zacetno_stanje_vode'));
 }
 
+function jeNapakaPrekrivanjaNajemnikov(sporocilo: string | undefined) {
+  const niz = String(sporocilo ?? '').toLowerCase();
+  return niz.includes('prekrivajočem obdobju') || niz.includes('prekrivajocem obdobju');
+}
+
+function formatirajDatumZaSporocilo(datum: string | null | undefined) {
+  if (!datum) return null;
+  const [leto, mesec, dan] = datum.split('-');
+  if (!leto || !mesec || !dan) return datum;
+  return `${dan}.${mesec}.${leto}`;
+}
+
+function obdobjiSePrekrivata(
+  prvoOd: string,
+  prvoDo: string | null,
+  drugoOd: string,
+  drugoDo: string | null
+) {
+  return (!prvoDo || drugoOd <= prvoDo) && (!drugoDo || prvoOd <= drugoDo);
+}
+
 Deno.serve(async (req) => {
   const cors = preberiCorsNastavitve();
   const origin = req.headers.get('origin');
@@ -294,6 +315,81 @@ Deno.serve(async (req) => {
     obstojeciProfil = profil ?? null;
   }
 
+  const aktiven = vhod.aktiven ?? obstojeciProfil?.aktiven ?? true;
+  const danes = new Date().toISOString().slice(0, 10);
+  const vhodUporabnikDo = datumNizAliNull(vhod.uporabnik_do);
+  const uporabnikOd = datumNizAliNull(vhod.uporabnik_od) ?? danes;
+  const pogodbaOd = datumNizAliNull(vhod.pogodba_od);
+  const pogodbaDo = datumNizAliNull(vhod.pogodba_do);
+  const imaElektrikoVhod = Object.prototype.hasOwnProperty.call(vhod, 'zacetno_stanje_elektrike');
+  const imaVodoVhod = Object.prototype.hasOwnProperty.call(vhod, 'zacetno_stanje_vode');
+  const zacetnoStanjeElektrike = imaElektrikoVhod ? steviloAliNull(vhod.zacetno_stanje_elektrike) : undefined;
+  const zacetnoStanjeVode = imaVodoVhod ? steviloAliNull(vhod.zacetno_stanje_vode) : undefined;
+  if (zacetnoStanjeElektrike != null && Number.isNaN(zacetnoStanjeElektrike)) {
+    return json(req, cors, { napaka: 'Začetno stanje elektrike mora biti 0 ali več.' }, 400);
+  }
+  if (zacetnoStanjeVode != null && Number.isNaN(zacetnoStanjeVode)) {
+    return json(req, cors, { napaka: 'Začetno stanje vode mora biti 0 ali več.' }, 400);
+  }
+  const uporabnikDo = aktiven
+    ? null
+    : vhodUporabnikDo ?? obstojeciProfil?.uporabnik_do ?? null;
+
+  if (!aktiven && !uporabnikDo) {
+    return json(req, cors, { napaka: 'Za neaktivnega uporabnika je obvezen datum »Uporabnik do«.' }, 400);
+  }
+  if (uporabnikDo && uporabnikOd > uporabnikDo) {
+    return json(req, cors, { napaka: 'Datum »Uporabnik od« ne more biti po datumu »Uporabnik do«.' }, 400);
+  }
+  if (pogodbaOd && pogodbaDo && pogodbaOd > pogodbaDo) {
+    return json(req, cors, { napaka: 'Datum »Pogodba od« ne more biti po datumu »Pogodba do«.' }, 400);
+  }
+
+  const sobaId = vhod.soba_id ?? null;
+
+  // Preverjanje izvedemo pred Auth spremembo, da ob prekrivanju ne nastane osirotel Auth uporabnik.
+  // Aktivni uporabnik ima odprto obdobje, dokler ga admin ne označi kot neaktivnega.
+  if (sobaId) {
+    const { data: uporabnikiSobe, error: napakaUporabnikovSobe } = await adminClient
+      .from('uporabniki')
+      .select('id, ime, priimek, aktiven, uporabnik_od, uporabnik_do, pogodba_od, pogodba_do')
+      .eq('soba_id', sobaId);
+
+    if (napakaUporabnikovSobe) {
+      return json(req, cors, { napaka: napakaUporabnikovSobe.message }, 400);
+    }
+
+    const novoObdobjeOd = pogodbaOd ?? uporabnikOd;
+    const novoObdobjeDo = aktiven ? null : (pogodbaDo ?? uporabnikDo);
+    const konflikt = (uporabnikiSobe ?? []).find((obstojeci) => {
+      if (obstojeci.id === uporabnikId) return false;
+      const obstojeciOd = obstojeci.pogodba_od ?? obstojeci.uporabnik_od ?? danes;
+      const obstojeciDo = obstojeci.aktiven
+        ? null
+        : (obstojeci.pogodba_do ?? obstojeci.uporabnik_do ?? danes);
+      return obdobjiSePrekrivata(novoObdobjeOd, novoObdobjeDo, obstojeciOd, obstojeciDo);
+    });
+
+    if (konflikt) {
+      const imeKonflikta = `${konflikt.ime ?? ''} ${konflikt.priimek ?? ''}`.trim() || 'drug uporabnik';
+      const konfliktOd = formatirajDatumZaSporocilo(konflikt.pogodba_od ?? konflikt.uporabnik_od);
+      const obdobjeOpis = konfliktOd ? ` od ${konfliktOd}` : '';
+      const navodilo = konflikt.aktiven
+        ? 'Najprej uredite tega uporabnika: izklopite možnost »Aktiven« in pravilno nastavite datum »Uporabnik do«, nato poskusite znova.'
+        : 'Najprej popravite datume obstoječega ali novega uporabnika, da se obdobji ne bosta prekrivali, nato poskusite znova.';
+      return json(
+        req,
+        cors,
+        {
+          napaka: `Izbrane sobe ni mogoče dodeliti, ker jo ima ${imeKonflikta}${obdobjeOpis} že dodeljeno v prekrivajočem obdobju. ${navodilo}`
+        },
+        400
+      );
+    }
+  }
+
+  let ustvarjenNovAuthUporabnik = false;
+
   if (uporabnikId) {
     const authPosodobitev: { email?: string; password?: string } = {};
 
@@ -322,28 +418,12 @@ Deno.serve(async (req) => {
     }
 
     uporabnikId = novAuth.user.id;
+    ustvarjenNovAuthUporabnik = true;
   }
-
-  const aktiven = vhod.aktiven ?? obstojeciProfil?.aktiven ?? true;
-  const danes = new Date().toISOString().slice(0, 10);
-  const vhodUporabnikDo = datumNizAliNull(vhod.uporabnik_do);
-  const imaElektrikoVhod = Object.prototype.hasOwnProperty.call(vhod, 'zacetno_stanje_elektrike');
-  const imaVodoVhod = Object.prototype.hasOwnProperty.call(vhod, 'zacetno_stanje_vode');
-  const zacetnoStanjeElektrike = imaElektrikoVhod ? steviloAliNull(vhod.zacetno_stanje_elektrike) : undefined;
-  const zacetnoStanjeVode = imaVodoVhod ? steviloAliNull(vhod.zacetno_stanje_vode) : undefined;
-  if (zacetnoStanjeElektrike != null && Number.isNaN(zacetnoStanjeElektrike)) {
-    return json(req, cors, { napaka: 'Začetno stanje elektrike mora biti 0 ali več.' }, 400);
-  }
-  if (zacetnoStanjeVode != null && Number.isNaN(zacetnoStanjeVode)) {
-    return json(req, cors, { napaka: 'Začetno stanje vode mora biti 0 ali več.' }, 400);
-  }
-  const uporabnikDo = aktiven
-    ? null
-    : vhodUporabnikDo ?? obstojeciProfil?.uporabnik_do ?? danes;
 
   const payload = {
     id: uporabnikId,
-    soba_id: vhod.soba_id ?? null,
+    soba_id: sobaId,
     ime,
     priimek,
     telefon: vhod.telefon ?? null,
@@ -356,10 +436,10 @@ Deno.serve(async (req) => {
       : (obstojeciProfil?.zacetno_stanje_vode ?? null),
     aktiven,
     admin: vhod.admin ?? false,
-    uporabnik_od: datumNizAliNull(vhod.uporabnik_od) ?? danes,
+    uporabnik_od: uporabnikOd,
     uporabnik_do: uporabnikDo,
-    pogodba_od: datumNizAliNull(vhod.pogodba_od),
-    pogodba_do: datumNizAliNull(vhod.pogodba_do),
+    pogodba_od: pogodbaOd,
+    pogodba_do: pogodbaDo,
     posodobil: caller.id
   };
 
@@ -376,7 +456,29 @@ Deno.serve(async (req) => {
   }
 
   if (profilError) {
-    return json(req, cors, { napaka: profilError.message }, 400);
+    let napakaBrisanjaAuth: string | null = null;
+
+    if (ustvarjenNovAuthUporabnik && uporabnikId) {
+      const { error: deleteAuthError } = await adminClient.auth.admin.deleteUser(uporabnikId);
+      napakaBrisanjaAuth = deleteAuthError?.message ?? null;
+    }
+
+    const sporociloProfila = jeNapakaPrekrivanjaNajemnikov(profilError.message)
+      ? 'Izbrane sobe ni mogoče dodeliti, ker jo ima drug uporabnik še vedno dodeljeno v prekrivajočem obdobju. Najprej uredite obstoječega uporabnika: po potrebi izklopite možnost »Aktiven« in pravilno nastavite datum »Uporabnik do«, nato poskusite znova.'
+      : profilError.message;
+
+    if (napakaBrisanjaAuth) {
+      return json(
+        req,
+        cors,
+        {
+          napaka: `${sporociloProfila} Samodejno čiščenje Auth uporabnika ni uspelo: ${napakaBrisanjaAuth}`
+        },
+        500
+      );
+    }
+
+    return json(req, cors, { napaka: sporociloProfila }, 400);
   }
 
   return json(req, cors, { id: uporabnikId, sporocilo: 'Uporabnik uspesno shranjen.' });

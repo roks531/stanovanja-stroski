@@ -1011,6 +1011,18 @@ export default function AdminPogled() {
     e.preventDefault();
     setNapaka('');
     try {
+      if (!novUporabnik.aktiven && !novUporabnik.uporabnik_do) {
+        throw new Error('Za neaktivnega uporabnika je obvezen datum »Uporabnik do«.');
+      }
+
+      if (novUporabnik.uporabnik_od && novUporabnik.uporabnik_do) {
+        const uporabnikOd = dayjs(novUporabnik.uporabnik_od);
+        const uporabnikDo = dayjs(novUporabnik.uporabnik_do);
+        if (uporabnikOd.isValid() && uporabnikDo.isValid() && uporabnikOd.isAfter(uporabnikDo, 'day')) {
+          throw new Error('Datum »Uporabnik od« ne more biti po datumu »Uporabnik do«.');
+        }
+      }
+
       if (novUporabnik.pogodba_od && novUporabnik.pogodba_do) {
         const pogodbaOd = dayjs(novUporabnik.pogodba_od);
         const pogodbaDo = dayjs(novUporabnik.pogodba_do);

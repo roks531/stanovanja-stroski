@@ -362,6 +362,33 @@ export default function UporabnikiSekcija({
                     }}
                   />
                   <DatePicker
+                    label="Uporabnik do"
+                    disabled={novUporabnik.aktiven}
+                    value={novUporabnik.uporabnik_do ? dayjs(novUporabnik.uporabnik_do) : null}
+                    onChange={(novaVrednost) =>
+                      setNovUporabnik({
+                        ...novUporabnik,
+                        uporabnik_do: novaVrednost ? novaVrednost.format('YYYY-MM-DD') : null
+                      })
+                    }
+                    slotProps={{
+                      textField: {
+                        size: 'small',
+                        helperText: novUporabnik.aktiven ? 'Najprej izklopite možnost »Aktiven«.' : '',
+                        sx: {
+                          flex: '1 1 150px',
+                          '& .MuiInputLabel-root': { fontSize: '0.8rem' },
+                          '& .MuiInputLabel-root.MuiInputLabel-shrink': { fontSize: '0.74rem' },
+                          '& .MuiInputBase-input': { fontSize: '0.82rem' },
+                          '& .MuiFormHelperText-root': { fontSize: '0.68rem', mx: 0.25 },
+                          '& .MuiPickersSectionList-root': { fontSize: '0.82rem' },
+                          '& .MuiPickersSectionList-section': { fontSize: '0.82rem' },
+                          '& .MuiPickersInputBase-input': { fontSize: '0.82rem' }
+                        }
+                      }
+                    }}
+                  />
+                  <DatePicker
                     label="Pogodba od"
                     value={novUporabnik.pogodba_od ? dayjs(novUporabnik.pogodba_od) : null}
                     onChange={(novaVrednost) =>
