@@ -208,7 +208,7 @@ export default function NajemnikPogled() {
         (obdobje) =>
           Number(obdobje.mesec) === Number(vnosStevca.mesec) &&
           Number(obdobje.leto) === Number(vnosStevca.leto)
-      ) ?? paket?.obdobjeZaVnos ?? null,
+      ) ?? null,
     [paket, vnosStevca.mesec, vnosStevca.leto]
   );
 
@@ -380,16 +380,20 @@ export default function NajemnikPogled() {
         (racun?.strosek_vode ?? 0)
     );
 
+  const jeZaklenjenoZaradiZaporedja = Boolean(izbranoObdobjeVnosa?.zaporedjeZaklenjeno);
+  // Vnos je zaklenjen, dokler ogrevanje ni pripravljeno ali dokler ni oddano starejše obdobje.
   const jeOgrevanjeZaklenjeno =
-    izbranoObdobjeVnosa
+    jeZaklenjenoZaradiZaporedja ||
+    (izbranoObdobjeVnosa
       ? izbranoObdobjeVnosa.ogrevanjePripravljeno === false
-      : paket?.ogrevanjePripravljeno === false;
-  const jeObdobjeZeOddano = Boolean(izbranoObdobjeVnosa?.odcitek_obstaja);
+      : paket?.ogrevanjePripravljeno === false);
+  const jeObdobjeZeOddano = Boolean(izbranoObdobjeVnosa?.odcitek_obstaja || izbranoObdobjeVnosa?.oddano);
   const nazivObdobjaVnosa =
     `${IMENA_MESECEV_SL[Number(vnosStevca.mesec) - 1] ?? String(vnosStevca.mesec)} ${vnosStevca.leto}`;
   const sporociloZeOddano =
     `Za obdobje ${nazivObdobjaVnosa} so podatki že oddani. Če opaziš napako, kontaktiraj najemodajalca.`;
   const sporociloZaklepaOgrevanja =
+    (jeZaklenjenoZaradiZaporedja ? izbranoObdobjeVnosa?.sporociloZaporedja : '') ||
     izbranoObdobjeVnosa?.sporociloZaklepaOgrevanja ||
     paket?.sporociloZaklepaOgrevanja ||
     'Najemodajalec še ni izračunal stroška ogrevanja, poskusi ponovno jutri.';

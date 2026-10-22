@@ -229,15 +229,77 @@ async function preveriNajemnikovoObdobjeVnosa(uporabnikId, mesec, leto) {
   if (!uporabnik) throw new Error('Uporabnik ni določen.');
 
   const dovoljenoOd = izracunajZacetnoObdobjeUporabnika(uporabnik);
-  if (!dovoljenoOd?.isValid()) return;
+  if (!dovoljenoOd?.isValid()) return null;
 
   const ciljnoObdobje = dayjs(`${leto}-${String(mesec).padStart(2, '0')}-01`);
-  if (!ciljnoObdobje.isValid()) return;
+  if (!ciljnoObdobje.isValid()) return dovoljenoOd;
 
   if (ciljnoObdobje.isBefore(dovoljenoOd, 'month')) {
     throw new Error(
       `Za obdobje ${formatObdobje(mesec, leto)} ne moreš oddati števcev ali potrditi obračuna. ` +
       `Prvo dovoljeno obdobje je ${formatObdobje(dovoljenoOd.month() + 1, dovoljenoOd.year())}.`
+    );
+  }
+
+  return dovoljenoOd;
+}
+
+// Najemnik vnaša za nazaj le toliko mesecev; starejše luknje v zgodovini ne blokirajo vnosa.
+const MAX_MESECEV_NAZAJ_ZA_VNOS = 12;
+
+function obdobjeIzMesecLeto(mesec, leto) {
+  return dayjs(`${leto}-${String(mesec).padStart(2, '0')}-01`);
+}
+
+function kljucObdobja(mesec, leto) {
+  return `${Number(leto)}-${Number(mesec)}`;
+}
+
+// Prvi mesec do tekočega, za katerega najemnik še nima odčitka ali obračuna (null, če so vsi oddani).
+// Obdobja je treba oddajati po vrsti, zato je to tudi edini mesec, ki je lahko trenutno odprt za vnos.
+function najdiPrvoNeoddanoObdobje({ oddanaObdobja, dovoljenoOd }) {
+  const tekoci = obdobjeIzMesecLeto(trenutniMesecLeto().mesec, trenutniMesecLeto().leto);
+  const oknoOd = tekoci.subtract(MAX_MESECEV_NAZAJ_ZA_VNOS - 1, 'month');
+  const najstarejseOddano = oddanaObdobja.reduce((min, o) => (!min || o.isBefore(min) ? o : min), null);
+
+  const osnova = dovoljenoOd?.isValid() ? dovoljenoOd : (najstarejseOddano ?? tekoci.subtract(1, 'month'));
+  let d = osnova.isBefore(oknoOd, 'month') ? oknoOd : osnova;
+
+  const oddana = new Set(oddanaObdobja.map((o) => kljucObdobja(o.month() + 1, o.year())));
+  for (; !d.isAfter(tekoci, 'month'); d = d.add(1, 'month')) {
+    if (!oddana.has(kljucObdobja(d.month() + 1, d.year()))) return d;
+  }
+  return null;
+}
+
+async function preveriZaporedjeVnosaNajemnika(sobaId, uporabnikId, mesec, leto, dovoljenoOd) {
+  const [odcitkiRes, placilaRes] = await Promise.all([
+    supabase
+      .from('odcitki')
+      .select('mesec, leto')
+      .eq('soba_id', sobaId)
+      .eq('uporabnik_id', uporabnikId)
+      .limit(240),
+    supabase
+      .from('placila')
+      .select('mesec, leto')
+      .eq('soba_id', sobaId)
+      .eq('uporabnik_id', uporabnikId)
+      .limit(240)
+  ]);
+  if (odcitkiRes.error) throw new Error(odcitkiRes.error.message);
+  if (placilaRes.error) throw new Error(placilaRes.error.message);
+
+  const oddanaObdobja = [...(odcitkiRes.data ?? []), ...(placilaRes.data ?? [])].map((o) =>
+    obdobjeIzMesecLeto(o.mesec, o.leto)
+  );
+  const prvoNeoddano = najdiPrvoNeoddanoObdobje({ oddanaObdobja, dovoljenoOd });
+  if (!prvoNeoddano) return;
+
+  if (obdobjeIzMesecLeto(mesec, leto).isAfter(prvoNeoddano, 'month')) {
+    throw new Error(
+      `Najprej oddaj obdobje ${formatObdobje(prvoNeoddano.month() + 1, prvoNeoddano.year())}, ` +
+      `obdobja je treba oddajati po vrsti.`
     );
   }
 }
@@ -338,28 +400,38 @@ async function pridobiZacetnaStanjaUporabnika(uporabnikId, sobaId) {
   };
 }
 
+// Najemnik lahko oddaja za nazaj: seznam vsebuje le obdobja brez odčitka ali obračuna,
+// od prvega manjkajočega meseca do tekočega meseca.
+function pripraviKandidateObdobijZaVnos({ dovoljenoOd, oddanaObdobja }) {
+  const tekoci = obdobjeIzMesecLeto(trenutniMesecLeto().mesec, trenutniMesecLeto().leto);
+  const prvoNeoddano = najdiPrvoNeoddanoObdobje({ oddanaObdobja, dovoljenoOd });
+  const oddana = new Set(oddanaObdobja.map((o) => kljucObdobja(o.month() + 1, o.year())));
+
+  const kandidati = [];
+  for (let d = prvoNeoddano ?? tekoci; !d.isAfter(tekoci, 'month'); d = d.add(1, 'month')) {
+    const mesec = d.month() + 1;
+    if (!oddana.has(kljucObdobja(mesec, d.year())) && jeObdobjeVsajOd(mesec, d.year(), dovoljenoOd)) {
+      kandidati.push({ mesec, leto: d.year() });
+    }
+  }
+  return kandidati;
+}
+
 async function pripraviObdobjaZaVnosNajemnika({ uporabnik, uporabnikId, soba, placila, odcitkiSoba }) {
   const dovoljenoOd = izracunajZacetnoObdobjeUporabnika(uporabnik);
-  const kandidati = [trenutniMesecLeto(), prejsnjiMesecLeto()].filter(
-    (obdobje, index, seznam) =>
-      seznam.findIndex(
-        (drugo) => Number(drugo.mesec) === Number(obdobje.mesec) && Number(drugo.leto) === Number(obdobje.leto)
-      ) === index
-  );
+  const oddanaObdobja = [
+    ...(placila ?? []).filter((p) => !p.soba_id || p.soba_id === soba.id),
+    ...(odcitkiSoba ?? []).filter((o) => o.uporabnik_id === uporabnikId)
+  ].map((o) => obdobjeIzMesecLeto(o.mesec, o.leto));
+  const oddanaKljuci = new Set(oddanaObdobja.map((o) => kljucObdobja(o.month() + 1, o.year())));
+  const dovoljeniKandidati = pripraviKandidateObdobijZaVnos({ dovoljenoOd, oddanaObdobja });
 
-  const dovoljeniKandidati = kandidati.filter((obdobje) =>
-    jeObdobjeVsajOd(obdobje.mesec, obdobje.leto, dovoljenoOd)
-  );
-
-  const odprtiKandidati = dovoljeniKandidati.filter((obdobje) => {
-    const placilo = najdiPlaciloZaObdobje(placila, obdobje.mesec, obdobje.leto);
-    return !placilo?.placano;
-  });
-
+  // Če je vse že oddano, pokažemo tekoči mesec z obvestilom, da so podatki oddani.
+  const tekociMesec = trenutniMesecLeto();
   const uporabljeniKandidati =
-    odprtiKandidati.length > 0
-      ? odprtiKandidati
-      : (dovoljeniKandidati.length > 0 ? [dovoljeniKandidati[0]] : []);
+    dovoljeniKandidati.length > 0
+      ? dovoljeniKandidati
+      : (jeObdobjeVsajOd(tekociMesec.mesec, tekociMesec.leto, dovoljenoOd) ? [tekociMesec] : []);
 
   const { data: sobeTipa, error: napakaSobeTipa } = await supabase
     .from('sobe')
@@ -415,6 +487,7 @@ async function pripraviObdobjaZaVnosNajemnika({ uporabnik, uporabnikId, soba, pl
         oznaka: formatObdobje(mesec, leto),
         placano: Boolean(placilo?.placano),
         odcitek_obstaja: Boolean(odcitekObdobja?.id),
+        oddano: oddanaKljuci.has(kljucObdobja(mesec, leto)) || Boolean(placilo?.id),
         stanje_elektrike:
           odcitekObdobja?.stanje_elektrike == null
             ? Number(prejsnjeStanjeElektrike ?? 0)
@@ -438,8 +511,20 @@ async function pripraviObdobjaZaVnosNajemnika({ uporabnik, uporabnikId, soba, pl
     })
   );
 
+  // Obdobja so urejena od najstarejšega; vnos je odprt le za prvo neoddano obdobje.
+  obdobjaZaVnos.sort((a, b) => Number(a.leto) - Number(b.leto) || Number(a.mesec) - Number(b.mesec));
+  const prvoNeoddano = obdobjaZaVnos.find((obdobje) => !obdobje.oddano) ?? null;
+  obdobjaZaVnos.forEach((obdobje) => {
+    const jeZaPrvimNeoddanim = Boolean(prvoNeoddano) && !obdobje.oddano && obdobje !== prvoNeoddano;
+    obdobje.zaporedjeZaklenjeno = jeZaPrvimNeoddanim;
+    obdobje.sporociloZaporedja = jeZaPrvimNeoddanim
+      ? `Najprej oddaj obdobje ${prvoNeoddano.oznaka}, obdobja je treba oddajati po vrsti.`
+      : '';
+  });
+
   const trenutniMesec = trenutniMesecLeto();
   const privzetoObdobje =
+    prvoNeoddano ??
     obdobjaZaVnos.find(
       (obdobje) =>
         Number(obdobje.mesec) === Number(trenutniMesec.mesec) &&
@@ -640,7 +725,8 @@ export async function shraniNajemnikovOdcitek(vrednosti, posodobil) {
   if (!uporabnikId) throw new Error('Uporabnik ni določen.');
   if (!Number.isFinite(mesec) || mesec < 1 || mesec > 12) throw new Error('Mesec ni veljaven.');
   if (!Number.isFinite(leto) || leto < 2024) throw new Error('Leto ni veljavno.');
-  await preveriNajemnikovoObdobjeVnosa(uporabnikId, mesec, leto);
+  const dovoljenoOd = await preveriNajemnikovoObdobjeVnosa(uporabnikId, mesec, leto);
+  await preveriZaporedjeVnosaNajemnika(sobaId, uporabnikId, mesec, leto, dovoljenoOd);
   if (!Number.isFinite(stanjeElektrike) || stanjeElektrike < 0) {
     throw new Error('Stanje elektrike mora biti 0 ali več.');
   }
@@ -729,7 +815,8 @@ export async function potrdiNajemnikovObracun(vrednosti, posodobil) {
   if (!uporabnikId) throw new Error('Uporabnik ni določen.');
   if (!Number.isFinite(mesec) || mesec < 1 || mesec > 12) throw new Error('Mesec ni veljaven.');
   if (!Number.isFinite(leto) || leto < 2024) throw new Error('Leto ni veljavno.');
-  await preveriNajemnikovoObdobjeVnosa(uporabnikId, mesec, leto);
+  const dovoljenoOd = await preveriNajemnikovoObdobjeVnosa(uporabnikId, mesec, leto);
+  await preveriZaporedjeVnosaNajemnika(sobaId, uporabnikId, mesec, leto, dovoljenoOd);
 
   const { data: soba, error: napakaSoba } = await supabase
     .from('sobe')
