@@ -7,7 +7,12 @@ import { useAvtentikacija } from './kontekst/AvtentikacijaKontekst';
 
 function Nalaganje() {
   return (
-    <Box minHeight="100vh" display="grid" sx={{ placeItems: 'center' }}>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: 'center'
+      }}>
       <CircularProgress />
     </Box>
   );

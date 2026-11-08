@@ -14,8 +14,12 @@
  *   6 – Stroški
  *   7 – Beležke
  */
+import { useObvestila } from '../kontekst/ObvestilaKontekst';
+import { useQueryClient } from '@tanstack/react-query';
+import { pripraviStevceRocnegaObracuna, preveriStevceRocnegaObracuna, izracunajStroskeStevcev } from '../storitve/rocniObracun';
+import { adminObvestilaPoizvedba } from '../storitve/adminObvestilaPoizvedba';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Box, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 // Ikone za stranski meni
 import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined';
 import MeetingRoomOutlinedIcon from '@mui/icons-material/MeetingRoomOutlined';
@@ -96,13 +100,18 @@ function preberiStevilkoIzStorage(kljuc, privzeto, dovoljeneVrednosti) {
 }
 
 export default function AdminPogled() {
+  const { napaka: prikaziNapako, uspeh: prikaziUspeh, info: prikaziInfo } = useObvestila();
   const { seja, profil, odjava, osveziProfil } = useAvtentikacija();
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (seja?.user?.id) {
+      void queryClient.prefetchQuery(adminObvestilaPoizvedba(seja.user.id));
+    }
+  }, [queryClient, seja?.user?.id]);
   const [tab, setTab] = useState(() =>
     preberiStevilkoIzStorage(KLJUC_ADMIN_TAB, 0, DOVOLJENI_ADMIN_TABI)
   );
   const [nalaganje, setNalaganje] = useState(true);
-  const [napaka, setNapaka] = useState('');
-  const [obvestilo, setObvestilo] = useState('');
   const [potrjevanjeObdobja, setPotrjevanjeObdobja] = useState(false);
   const [ceneStevciPodtab, setCeneStevciPodtab] = useState(() =>
     preberiStevilkoIzStorage(KLJUC_ADMIN_CENE_STEVCI_PODTAB, 0, [0, 1])
@@ -306,7 +315,7 @@ export default function AdminPogled() {
       cena_elektrike: cena.cena_elektrike ?? 0,
       cena_vode: cena.cena_vode ?? 0
     });
-    setObvestilo('Urejanje cene je omogočeno. Obračuni ostanejo na svojih shranjenih vrednostih.');
+    prikaziInfo('Urejanje cene je omogočeno. Obračuni ostanejo na svojih shranjenih vrednostih.');
   }
 
   function izberiOgrevanjeZaUrejanje(ogrevanjeId, seznam = podatki.ogrevanjeTipi) {
@@ -491,7 +500,7 @@ export default function AdminPogled() {
     try {
       await navigator.clipboard.writeText(novUporabnik.geslo);
     } catch {
-      setNapaka('Gesla ni bilo mogoce kopirati v odlozisce.');
+      prikaziNapako('Gesla ni bilo mogoce kopirati v odlozisce.');
     }
   }
 
@@ -500,12 +509,11 @@ export default function AdminPogled() {
     if (prikaziNalaganje) {
       setNalaganje(true);
     }
-    setNapaka('');
     try {
       const data = await pridobiAdminPodatke();
       setPodatki(data);
     } catch (err) {
-      setNapaka(err.message || 'Napaka pri nalaganju admin podatkov.');
+      prikaziNapako(err.message || 'Napaka pri nalaganju admin podatkov.');
       if (vrziNapako) throw err;
     } finally {
       if (prikaziNalaganje) {
@@ -1009,7 +1017,6 @@ export default function AdminPogled() {
 
   async function shraniUporabnika(e) {
     e.preventDefault();
-    setNapaka('');
     try {
       if (!novUporabnik.aktiven && !novUporabnik.uporabnik_do) {
         throw new Error('Za neaktivnega uporabnika je obvezen datum »Uporabnik do«.');
@@ -1083,21 +1090,22 @@ export default function AdminPogled() {
         await osveziProfil({ prikaziNalaganje: false });
       }
       ponastaviUporabnikForm();
+      prikaziUspeh('Uporabnik je uspešno shranjen.');
+      return true;
     } catch (err) {
-      setNapaka(err.message || 'Uporabnika ni bilo mogoce shraniti.');
+      prikaziNapako(err.message || 'Uporabnika ni bilo mogoce shraniti.');
+      return false;
     }
   }
 
   async function izbrisiUporabnika(ciljniUporabnik = null) {
-    setNapaka('');
-    setObvestilo('');
 
     const uporabnikZaBrisanje = ciljniUporabnik ?? novUporabnik;
     const uporabnikId = String(uporabnikZaBrisanje?.id ?? '').trim();
 
     if (!uporabnikId) return;
     if (uporabnikId === seja.user.id) {
-      setNapaka('Trenutno prijavljenega admin uporabnika ni mogoče izbrisati.');
+      prikaziNapako('Trenutno prijavljenega admin uporabnika ni mogoče izbrisati.');
       return;
     }
 
@@ -1120,9 +1128,9 @@ export default function AdminPogled() {
       if (novUporabnik.id === uporabnikId) {
         ponastaviUporabnikForm();
       }
-      setObvestilo('Uporabnik je uspešno izbrisan.');
+      prikaziUspeh('Uporabnik je uspešno izbrisan.');
     } catch (err) {
-      setNapaka(err?.message || 'Uporabnika ni bilo mogoče izbrisati.');
+      prikaziNapako(err?.message || 'Uporabnika ni bilo mogoče izbrisati.');
     } finally {
       setObdelujemBrisanje(false);
     }
@@ -1130,7 +1138,6 @@ export default function AdminPogled() {
 
   async function shraniNovoSobo(e) {
     e.preventDefault();
-    setNapaka('');
     try {
       const jePosodobitev = Boolean(novaSoba.id);
       const shranjena = await shraniSoboStoritev(pripraviSoboPayload(novaSoba), seja.user.id);
@@ -1141,8 +1148,11 @@ export default function AdminPogled() {
       } else {
         ponastaviNovoSoboForm();
       }
+      prikaziUspeh('Soba je uspešno shranjena.');
+      return true;
     } catch (err) {
-      setNapaka(err.message || 'Sobe ni bilo mogoce shraniti.');
+      prikaziNapako(err.message || 'Sobe ni bilo mogoce shraniti.');
+      return false;
     }
   }
 
@@ -1161,41 +1171,6 @@ export default function AdminPogled() {
         sobe: noveSobe
       };
     });
-  }
-
-  async function obdelajPosodobitevSobe(novaVrstica) {
-    setNapaka('');
-    const shranjena = await shraniSoboStoritev(pripraviSoboPayload(novaVrstica), seja.user.id);
-    const najdenPosodobil = podatki.uporabniki.find((u) => u.id === shranjena.posodobil);
-    const posodobilIme =
-      (najdenPosodobil && `${najdenPosodobil.ime ?? ''} ${najdenPosodobil.priimek ?? ''}`.trim()) ||
-      najdenPosodobil?.email ||
-      shranjena.posodobil ||
-      '-';
-
-    vstaviAliPosodobiSoboVStanju(shranjena);
-
-    return {
-      ...novaVrstica,
-      ime_sobe: shranjena.ime_sobe,
-      tip_hise: shranjena.tip_hise,
-      voda_stanje: Boolean(shranjena.voda_stanje),
-      voda: Number(shranjena.voda ?? 0),
-      najemnina: Number(shranjena.najemnina ?? 0),
-      strosek_skupni: Number(shranjena.strosek_skupni ?? 0),
-      nettv: Number(shranjena.nettv ?? shranjena.strosek_neta ?? 0),
-      fiksni: Number(shranjena.fiksni ?? shranjena.strosek_tv ?? 0),
-      faktor_ogrevanja: normalizirajDelezOgrevanja(shranjena.faktor_ogrevanja),
-      posodobil_ime: posodobilIme,
-      posodobljeno_oblikovano: shranjena.posodobljeno_ob
-        ? dayjs(shranjena.posodobljeno_ob).format('DD.MM.YYYY HH:mm')
-        : '-',
-      aktivna: Boolean(shranjena.aktivna)
-    };
-  }
-
-  function obdelajNapakoPosodobitveSobe(err) {
-    setNapaka(err?.message || 'Sobe ni bilo mogoce posodobiti.');
   }
 
   function vnosStevila(vrednost, privzeto) {
@@ -1224,23 +1199,15 @@ export default function AdminPogled() {
     }));
   }
 
-  function jeVrsticaSobeUredljiva(params) {
-    if (params?.field === 'voda') {
-      return !sobaImaVodniStevec(params?.row);
-    }
-    return Boolean(params?.row?.id);
-  }
-
   function helperZaSobo() {
     if (podatki.sobe.length === 0) {
-      return 'Najprej dodaj prvo sobo spodaj.';
+      return 'Prvo sobo dodaj z gumbom »Nova soba«.';
     }
-    return 'Dvakrat klikni celico za urejanje in pritisni Enter za shranjevanje.';
+    return 'Za urejanje klikni vrstico ali ikono svinčnika.';
   }
 
   async function shraniCeno(e) {
     e.preventDefault();
-    setNapaka('');
     try {
       await dodajCeno({
         id: novaCena.id || undefined,
@@ -1249,16 +1216,17 @@ export default function AdminPogled() {
         cena_elektrike: Number(novaCena.cena_elektrike),
         cena_vode: Number(novaCena.cena_vode)
       }, seja.user.id);
-      await nalozi({ prikaziNalaganje: true, vrziNapako: true });
+      await nalozi({ prikaziNalaganje: false, vrziNapako: true });
       ponastaviCenaForm();
+      prikaziUspeh('Cena je uspešno shranjena.');
+      return true;
     } catch (err) {
-      setNapaka(String(err?.message ?? '') || 'Cene ni bilo mogoče shraniti.');
+      prikaziNapako(String(err?.message ?? '') || 'Cene ni bilo mogoče shraniti.');
+      return false;
     }
   }
 
   async function izbrisiCenoVrstico(vrstica) {
-    setNapaka('');
-    setObvestilo('');
 
     if (!vrstica?.id) return;
 
@@ -1275,17 +1243,15 @@ export default function AdminPogled() {
       if (novaCena.id === vrstica.id) {
         ponastaviCenaForm();
       }
-      setObvestilo('Cena je uspešno izbrisana.');
+      prikaziUspeh('Cena je uspešno izbrisana.');
     } catch (err) {
-      setNapaka(String(err?.message ?? '') || 'Cene ni bilo mogoče izbrisati.');
+      prikaziNapako(String(err?.message ?? '') || 'Cene ni bilo mogoče izbrisati.');
     } finally {
       setObdelujemBrisanje(false);
     }
   }
 
   async function dodajStrosek(vnos) {
-    setNapaka('');
-    setObvestilo('');
 
     const strosek = String(vnos?.strosek ?? '').trim();
     const postavke = Array.isArray(vnos?.postavke) ? vnos.postavke : [];
@@ -1293,7 +1259,7 @@ export default function AdminPogled() {
 
     if (!strosek) {
       const sporocilo = 'Strošek je obvezen.';
-      setNapaka(sporocilo);
+      prikaziNapako(sporocilo);
       throw new Error(sporocilo);
     }
 
@@ -1301,7 +1267,7 @@ export default function AdminPogled() {
       const znesek = Number(vnos?.znesek);
       if (!Number.isFinite(znesek) || znesek < 0) {
         const sporocilo = 'Znesek mora biti 0 ali več.';
-        setNapaka(sporocilo);
+        prikaziNapako(sporocilo);
         throw new Error(sporocilo);
       }
     }
@@ -1326,17 +1292,15 @@ export default function AdminPogled() {
 
       await shraniStrosekPostavke(shranjen.id, imaPostavke ? postavke : []);
       await nalozi({ prikaziNalaganje: false, vrziNapako: true });
-      setObvestilo(vnos?.id ? 'Strošek je uspešno posodobljen.' : 'Strošek je uspešno dodan.');
+      prikaziUspeh(vnos?.id ? 'Strošek je uspešno posodobljen.' : 'Strošek je uspešno dodan.');
     } catch (err) {
       const sporocilo = err?.message || 'Stroška ni bilo mogoče shraniti.';
-      setNapaka(sporocilo);
+      prikaziNapako(sporocilo);
       throw new Error(sporocilo);
     }
   }
 
   async function izbrisiStrosekVrstico(vrstica) {
-    setNapaka('');
-    setObvestilo('');
 
     if (!vrstica?.id) return;
 
@@ -1350,24 +1314,22 @@ export default function AdminPogled() {
       setObdelujemBrisanje(true);
       await izbrisiStrosekStoritev(vrstica.id);
       await nalozi({ prikaziNalaganje: true, vrziNapako: true });
-      setObvestilo('Strošek je uspešno izbrisan.');
+      prikaziUspeh('Strošek je uspešno izbrisan.');
     } catch (err) {
-      setNapaka(String(err?.message ?? '') || 'Stroška ni bilo mogoče izbrisati.');
+      prikaziNapako(String(err?.message ?? '') || 'Stroška ni bilo mogoče izbrisati.');
     } finally {
       setObdelujemBrisanje(false);
     }
   }
 
   async function izbrisiObracunVrstico(vrstica) {
-    setNapaka('');
-    setObvestilo('');
 
     if (!vrstica?.placilo_id) {
-      setNapaka('Obračun ni določen.');
+      prikaziNapako('Obračun ni določen.');
       return;
     }
     if (vrstica.placano) {
-      setNapaka('Potrjenega obračuna ni mogoče izbrisati. Najprej ga nastavi na odprto stanje.');
+      prikaziNapako('Potrjenega obračuna ni mogoče izbrisati. Najprej ga nastavi na odprto stanje.');
       return;
     }
 
@@ -1394,9 +1356,9 @@ export default function AdminPogled() {
           : prej.odcitki
       }));
 
-      setObvestilo('Obračun je uspešno izbrisan.');
+      prikaziUspeh('Obračun je uspešno izbrisan.');
     } catch (err) {
-      setNapaka(err?.message || 'Obračuna ni bilo mogoče izbrisati.');
+      prikaziNapako(err?.message || 'Obračuna ni bilo mogoče izbrisati.');
     } finally {
       setObdelujemBrisanje(false);
     }
@@ -1404,7 +1366,6 @@ export default function AdminPogled() {
 
   async function shraniOgrevanjePoTipu(e) {
     e.preventDefault();
-    setNapaka('');
     try {
       await shraniOgrevanjeTip(
         {
@@ -1419,14 +1380,15 @@ export default function AdminPogled() {
       );
       await nalozi();
       ponastaviOgrevanjeForm();
+      prikaziUspeh('Ogrevanje je uspešno shranjeno.');
+      return true;
     } catch (err) {
-      setNapaka(err.message || 'Ogrevanja po tipu ni bilo mogoce shraniti.');
+      prikaziNapako(err.message || 'Ogrevanja po tipu ni bilo mogoce shraniti.');
+      return false;
     }
   }
 
   async function izbrisiOgrevanjeVrstico(vrstica) {
-    setNapaka('');
-    setObvestilo('');
 
     if (!vrstica?.id) return;
 
@@ -1447,9 +1409,9 @@ export default function AdminPogled() {
       if (novoOgrevanje.id === vrstica.id) {
         ponastaviOgrevanjeForm();
       }
-      setObvestilo('Ogrevanje je uspešno izbrisano.');
+      prikaziUspeh('Ogrevanje je uspešno izbrisano.');
     } catch (err) {
-      setNapaka(err?.message || 'Ogrevanja ni bilo mogoče izbrisati.');
+      prikaziNapako(err?.message || 'Ogrevanja ni bilo mogoče izbrisati.');
     } finally {
       setObdelujemBrisanje(false);
     }
@@ -1478,8 +1440,6 @@ export default function AdminPogled() {
 
   async function shraniStevecAdmin(e) {
     e.preventDefault();
-    setNapaka('');
-    setObvestilo('');
     try {
       if (!novStevecAdmin.soba_id) {
         throw new Error('Izberi sobo.');
@@ -1506,16 +1466,16 @@ export default function AdminPogled() {
       );
 
       vstaviAliPosodobiOdcitekVStanju(shranjen);
-      setObvestilo('Števec je uspešno shranjen.');
+      prikaziUspeh('Števec je uspešno shranjen.');
       ponastaviStevecAdminForm();
+      return true;
     } catch (err) {
-      setNapaka(err.message || 'Števca ni bilo mogoče shraniti.');
+      prikaziNapako(err.message || 'Števca ni bilo mogoče shraniti.');
+      return false;
     }
   }
 
   async function izbrisiStevecAdminVrstico(vrstica) {
-    setNapaka('');
-    setObvestilo('');
 
     if (!vrstica?.id || vrstica.je_zacetno_stanje) return;
 
@@ -1534,17 +1494,15 @@ export default function AdminPogled() {
       if (novStevecAdmin.id === vrstica.id) {
         ponastaviStevecAdminForm();
       }
-      setObvestilo('Odčitek je uspešno izbrisan. Če za ta začetek najema obstaja začetno stanje, bo v tabeli prikazana začetna vrstica.');
+      prikaziUspeh('Odčitek je uspešno izbrisan. Če za ta začetek najema obstaja začetno stanje, bo v tabeli prikazana začetna vrstica.');
     } catch (err) {
-      setNapaka(err?.message || 'Odčitka ni bilo mogoče izbrisati.');
+      prikaziNapako(err?.message || 'Odčitka ni bilo mogoče izbrisati.');
     } finally {
       setObdelujemBrisanje(false);
     }
   }
 
   async function potrdiPrejsnjeObracunskoObdobje() {
-    setNapaka('');
-    setObvestilo('');
     const obdobje = prejsnjiMesecLeto();
     const nazivObdobja = `${imenaMesecov[obdobje.mesec - 1]} ${obdobje.leto}`;
     setPotrjevanjeObdobja(true);
@@ -1572,7 +1530,7 @@ export default function AdminPogled() {
         vrednosti: Object.fromEntries(manjkajociTipi.map((tip) => [tip, '']))
       });
     } catch (err) {
-      setNapaka(err.message || 'Potrditev obračunskega obdobja ni uspela.');
+      prikaziNapako(err.message || 'Potrditev obračunskega obdobja ni uspela.');
     } finally {
       setPotrjevanjeObdobja(false);
     }
@@ -1594,8 +1552,6 @@ export default function AdminPogled() {
   async function potrdiNastavitevManjkajocegaOgrevanjaNaNulo() {
     if (!dialogManjkajoceOgrevanje.mesec || !dialogManjkajoceOgrevanje.leto) return;
 
-    setNapaka('');
-    setObvestilo('');
     setPotrjevanjeObdobja(true);
 
     try {
@@ -1652,7 +1608,7 @@ export default function AdminPogled() {
           potrdiTipi: [],
           vrednosti: {}
         });
-        setObvestilo(`Podatki za obračune za obdobje ${dialogManjkajoceOgrevanje.nazivObdobja} so pripravljeni.`);
+        prikaziUspeh(`Podatki za obračune za obdobje ${dialogManjkajoceOgrevanje.nazivObdobja} so pripravljeni.`);
       } else {
         setDialogManjkajoceOgrevanje({
           odprt: true,
@@ -1664,12 +1620,12 @@ export default function AdminPogled() {
           potrdiTipi: [...preostaliManjkajoci],
           vrednosti: Object.fromEntries(preostaliManjkajoci.map((tip) => [tip, '']))
         });
-        setObvestilo(
+        prikaziUspeh(
           `Za obdobje ${dialogManjkajoceOgrevanje.nazivObdobja} še manjkajo podatki ogrevanja za: ${preostaliManjkajoci.join(', ')}.`
         );
       }
     } catch (err) {
-      setNapaka(err.message || 'Nastavitev manjkajočega ogrevanja ni uspela.');
+      prikaziNapako(err.message || 'Nastavitev manjkajočega ogrevanja ni uspela.');
     } finally {
       setPotrjevanjeObdobja(false);
     }
@@ -1706,7 +1662,6 @@ export default function AdminPogled() {
   }
 
   async function obdelajPosodobitevObracuna(novaVrstica, staraVrstica) {
-    setNapaka('');
     const imaOdcitek = Boolean(novaVrstica.odcitek_id);
 
     const stanjeElektrike = imaOdcitek
@@ -1907,8 +1862,6 @@ export default function AdminPogled() {
   }
 
   async function dodajRocniObracun(vnos) {
-    setNapaka('');
-    setObvestilo('');
 
     const sobaId = String(vnos?.soba_id ?? '').trim();
     const uporabnikId = String(vnos?.uporabnik_id ?? '').trim();
@@ -1925,14 +1878,14 @@ export default function AdminPogled() {
       leto < 2024
     ) {
       const sporocilo = 'Soba, najemnik, mesec in leto so obvezni.';
-      setNapaka(sporocilo);
+      prikaziNapako(sporocilo);
       throw new Error(sporocilo);
     }
 
     const najemnik = (podatki.uporabniki ?? []).find((u) => u.id === uporabnikId) ?? null;
-    if (!najemnik || najemnik.admin) {
+    if (!najemnik || najemnik.admin || najemnik.soba_id !== sobaId) {
       const sporocilo = 'Za ročni obračun izberi veljavnega najemnika.';
-      setNapaka(sporocilo);
+      prikaziNapako(sporocilo);
       throw new Error(sporocilo);
     }
 
@@ -1944,7 +1897,18 @@ export default function AdminPogled() {
       return parsed;
     };
 
+    let stevciShranjeni = false;
+    let kontekstStevcev = null;
     try {
+      const obstojeci = (podatki.placila ?? []).find((p) => p.soba_id === sobaId && p.uporabnik_id === uporabnikId && Number(p.mesec) === mesec && Number(p.leto) === leto);
+      if (obstojeci?.placano) throw new Error('Potrjenega obračuna ni mogoče prepisati.');
+      if (vnos.stevci) {
+        const odcitek = { ...vnos, ...vnos.stevci };
+        kontekstStevcev = pripraviStevceRocnegaObracuna(odcitek, podatki);
+        preveriStevceRocnegaObracuna(odcitek, kontekstStevcev, podatki);
+        const stroski = izracunajStroskeStevcev(odcitek, kontekstStevcev);
+        vnos = { ...vnos, strosek_elektrike: stroski.strosek_elektrike, strosek_vode: stroski.strosek_vode };
+      }
       const najemnina = parsePozitivno(vnos?.najemnina, 'Najemnina');
       const strosekSkupni = parsePozitivno(vnos?.strosek_skupni, 'Skupni strošek');
       const strosekNeta = parsePozitivno(vnos?.strosek_neta, 'NetTV');
@@ -1967,6 +1931,13 @@ export default function AdminPogled() {
         ).toFixed(2)
       );
 
+      if (vnos.stevci) {
+        await shraniAdminOdcitekSobe({ soba_id: sobaId, uporabnik_id: uporabnikId, mesec, leto,
+          ...vnos.stevci, preveri_povezane_obracune: true,
+          prejsnje_stanje_elektrike: kontekstStevcev.prejsnje_stanje_elektrike,
+          prejsnje_stanje_vode: kontekstStevcev.prejsnje_stanje_vode }, seja.user.id);
+        stevciShranjeni = true;
+      }
       await shraniAdminObracun(
         {
           soba_id: sobaId,
@@ -1991,16 +1962,18 @@ export default function AdminPogled() {
         seja.user.id
       );
       await nalozi({ prikaziNalaganje: false, vrziNapako: true });
-      setObvestilo('Ročni obračun je uspešno dodan.');
+      prikaziUspeh(vnos.stevci ? 'Števci in obračun so uspešno shranjeni.' : 'Ročni obračun je uspešno dodan.');
     } catch (err) {
-      const sporocilo = err?.message || 'Ročnega obračuna ni bilo mogoče dodati.';
-      setNapaka(sporocilo);
+      const sporocilo = stevciShranjeni
+        ? `Števci so shranjeni. Shranjevanje ali osvežitev obračuna ni uspela; poskusi znova. ${err?.message ?? ''}`
+        : err?.message || 'Ročnega obračuna ni bilo mogoče dodati.';
+      prikaziNapako(sporocilo);
       throw new Error(sporocilo);
     }
   }
 
   function obdelajNapakoPosodobitveObracuna(err) {
-    setNapaka(err?.message || 'Obračuna ni bilo mogoče posodobiti.');
+    prikaziNapako(err?.message || 'Obračuna ni bilo mogoče posodobiti.');
   }
 
   const gesloInfoText = novUporabnik.id
@@ -2025,7 +1998,7 @@ export default function AdminPogled() {
         ]
       });
     } catch (err) {
-      setNapaka(err?.message || 'Izvoz XLSX ni uspel.');
+      prikaziNapako(err?.message || 'Izvoz XLSX ni uspel.');
     }
   }
 
@@ -2238,7 +2211,7 @@ export default function AdminPogled() {
       }));
       setDialogPotrdiVse({ odprt: false, stevilo: 0, ids: [] });
     } catch (err) {
-      setNapaka(err.message);
+      prikaziNapako(err.message);
     } finally {
       setObdelujemPotrdiVse(false);
     }
@@ -2354,23 +2327,15 @@ export default function AdminPogled() {
       naslov={adminNaziv}
       podnaslov="Administrator"
       onOdjava={odjava}
+      zapolniVisino
     >
-      {/* ── Globalna sporočila (napaka / obvestilo) ── */}
-      {napaka && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setNapaka('')}>
-          {napaka}
-        </Alert>
-      )}
-      {obvestilo && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setObvestilo('')}>
-          {obvestilo}
-        </Alert>
-      )}
 
       {/* ── Nalagalni kazalec ── */}
       {nalaganje && (
         <Box sx={{ mb: 2 }}>
-          <Typography color="text.secondary">Nalaganje podatkov...</Typography>
+          <Typography sx={{
+            color: "text.secondary"
+          }}>Nalaganje podatkov...</Typography>
         </Box>
       )}
 
@@ -2422,9 +2387,6 @@ export default function AdminPogled() {
           stolpciSobe={stolpciSobe}
           moznostiStrani={moznostiStrani}
           lokalizacijaMreze={lokalizacijaMreze}
-          obdelajPosodobitevSobe={obdelajPosodobitevSobe}
-          obdelajNapakoPosodobitveSobe={obdelajNapakoPosodobitveSobe}
-          jeVrsticaSobeUredljiva={jeVrsticaSobeUredljiva}
           izberiSoboZaUrejanje={izberiSoboZaUrejanje}
         />
       )}
@@ -2483,6 +2445,11 @@ export default function AdminPogled() {
 
       {!nalaganje && tab === 4 && (
         <ObracuniSekcija
+          podatkiPlacila={podatki.placila}
+          podatkiOdcitki={podatki.odcitki}
+          podatkiCene={podatki.cene}
+          podatkiOgrevanje={podatki.ogrevanjeTipi}
+          osveziPodatke={() => nalozi({ prikaziNalaganje: false, vrziNapako: false })}
           vrsticeObracuniFiltrirane={vrsticeObracuniFiltrirane}
           odpreDialogPotrdiVse={odpreDialogPotrdiVse}
           dodajRocniObracun={dodajRocniObracun}

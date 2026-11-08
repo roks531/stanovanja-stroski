@@ -58,12 +58,16 @@ export default function AdminDialogi({
                   : 'obračunov'}?
             </Typography>
             {dialogPotrdiVse.stevilo === 0 && (
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{
+                color: "text.secondary"
+              }}>
                 Vsi filtrirani obračuni so že potrjeni.
               </Typography>
             )}
             {dialogPotrdiVse.stevilo > 0 && (
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{
+                color: "text.secondary"
+              }}>
                 Vsi odprti obračuni v trenutnem filtriranem pogledu bodo nastavljeni na status <strong>Potrjeno</strong> z današnjim datumom obračuna.
               </Typography>
             )}
@@ -99,13 +103,17 @@ export default function AdminDialogi({
         <DialogTitle>Potrdi podatke za obračune</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{
+              color: "text.secondary"
+            }}>
               Obdobje: <strong>{dialogManjkajoceOgrevanje.nazivObdobja}</strong>. Potrdi lahko podatke za
               posamezen tip hiše ali za oba skupaj. Ogrevanje lahko spreminjate tudi v rubriki ogrevanja.
             </Typography>
 
             {tipiHise.length === 0 && (
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{
+                color: "text.secondary"
+              }}>
                 Ni aktivnih tipov hiš za potrjevanje.
               </Typography>
             )}
@@ -125,7 +133,14 @@ export default function AdminDialogi({
                   }}
                 >
                   <Stack spacing={1}>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} flexWrap="wrap">
+                    <Stack
+                      direction="row"
+                      sx={{
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 1,
+                        flexWrap: "wrap"
+                      }}>
                       <Typography variant="subtitle2" sx={{ textTransform: 'capitalize', fontWeight: 700 }}>
                         {tip} hiša
                       </Typography>
@@ -163,7 +178,6 @@ export default function AdminDialogi({
                         <TextField
                           label={`Ogrevanje – ${tip} hiša`}
                           type="number"
-                          inputProps={{ min: 0, step: '0.01' }}
                           value={dialogManjkajoceOgrevanje.vrednosti[tip] ?? ''}
                           onChange={(e) =>
                             setDialogManjkajoceOgrevanje((prej) => ({
@@ -171,21 +185,26 @@ export default function AdminDialogi({
                               vrednosti: { ...prej.vrednosti, [tip]: e.target.value }
                             }))
                           }
-                          InputProps={{
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} />
-                              </InputAdornment>
-                            )
-                          }}
                           helperText="Prazno pomeni 0 €."
                           size="small"
                           fullWidth
                           disabled={potrjevanjeObdobja || !izbran}
-                        />
+                          slotProps={{
+                            input: {
+                              endAdornment: (
+                                <InputAdornment position="end">
+                                  <EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} />
+                                </InputAdornment>
+                              )
+                            },
+
+                            htmlInput: { min: 0, step: '0.01' }
+                          }} />
                       </>
                     ) : (
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" sx={{
+                        color: "text.secondary"
+                      }}>
                         Ogrevanje za ta tip hiše je za izbrano obdobje že potrjeno.
                       </Typography>
                     )}

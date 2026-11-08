@@ -548,7 +548,7 @@ export async function pridobiNajemnikPodatke(uporabnikId) {
 
   const soba = uporabnik.sobe;
   if (!soba) {
-    throw new Error('Uporabniku ni dodeljena soba.');
+    throw new Error('Uporabniku ni dodeljena soba. Prosimo obrnite se na najemodajalca.');
   }
 
   const [
@@ -993,7 +993,7 @@ export async function shraniAdminOdcitekSobe(vrednosti, posodobil) {
     vrednosti.prejsnje_stanje_elektrike === ''
       ? null
       : Number(vrednosti.prejsnje_stanje_elektrike);
-  const stanjeElektrike = Number(vrednosti.stanje_elektrike);
+  const stanjeElektrike = vrednosti.stanje_elektrike === '' || vrednosti.stanje_elektrike == null ? NaN : Number(vrednosti.stanje_elektrike);
   const prejsnjeStanjeVodeRaw =
     vrednosti.prejsnje_stanje_vode === null ||
     vrednosti.prejsnje_stanje_vode === undefined ||
@@ -1041,7 +1041,17 @@ export async function shraniAdminOdcitekSobe(vrednosti, posodobil) {
 
   const pretekli = await pridobiPretekliOdcitekSobe(sobaId, mesec, leto);
 
-  let uporabnikId = obstojeceObdobje?.uporabnik_id ?? null;
+  const izbraniUporabnik = vrednosti.uporabnik_id || null;
+  if (izbraniUporabnik) {
+    const { data: najemnik, error } = await supabase.from('uporabniki')
+      .select('id, soba_id, admin').eq('id', izbraniUporabnik).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!najemnik || najemnik.admin || najemnik.soba_id !== sobaId) throw new Error('Najemnik ne pripada izbrani sobi.');
+    if (obstojeceObdobje?.uporabnik_id && obstojeceObdobje.uporabnik_id !== izbraniUporabnik) {
+      throw new Error('Odčitek za ta mesec pripada drugemu najemniku.');
+    }
+  }
+  let uporabnikId = izbraniUporabnik ?? obstojeceObdobje?.uporabnik_id ?? null;
   if (!uporabnikId) {
     const { data: najemnik, error: napakaNajemnik } = await supabase
       .from('uporabniki')
@@ -1081,6 +1091,28 @@ export async function shraniAdminOdcitekSobe(vrednosti, posodobil) {
   }
   if (stanjeVode != null && stanjeVode < Number(prejsnjeStanjeVode ?? 0)) {
     throw new Error('Stanje vode ne sme biti manjše od začetnega/prejšnjega stanja.');
+  }
+
+  if (vrednosti.preveri_povezane_obracune) {
+    if (prejsnjeStanjeElektrike !== Number(prejsnjeStanjeElektrikeSamodejno) ||
+      (imaVodniStevec && prejsnjeStanjeVode !== Number(prejsnjeStanjeVodeSamodejno))) {
+      throw new Error('Prejšnji odčitek se je spremenil. Osveži podatke in poskusi znova.');
+    }
+    const { data: placilo, error: napakaPlacila } = await supabase.from('placila')
+      .select('placano').eq('soba_id', sobaId).eq('uporabnik_id', uporabnikId)
+      .eq('mesec', mesec).eq('leto', leto).maybeSingle();
+    if (napakaPlacila) throw new Error(napakaPlacila.message);
+    if (placilo?.placano) throw new Error('Potrjenega obračuna ni mogoče prepisati.');
+    const { data: poznejsi, error: napakaPoznejsih } = await supabase.from('odcitki')
+      .select('mesec, leto, prejsnje_stanje_elektrike, prejsnje_stanje_vode')
+      .eq('soba_id', sobaId).eq('uporabnik_id', uporabnikId).gte('leto', leto)
+      .order('leto').order('mesec');
+    if (napakaPoznejsih) throw new Error(napakaPoznejsih.message);
+    const naslednji = (poznejsi ?? []).find((o) => Number(o.leto) * 12 + Number(o.mesec) > leto * 12 + mesec);
+    if (naslednji && (Number(naslednji.prejsnje_stanje_elektrike) !== stanjeElektrike ||
+      (imaVodniStevec && Number(naslednji.prejsnje_stanje_vode) !== stanjeVode))) {
+      throw new Error('Najprej uskladi poznejše števce in obračune v pregledu števcev.');
+    }
   }
 
   const payload = {
@@ -1992,7 +2024,7 @@ export async function posljObvestila(sobaIds, sporocilo, ustvarilId) {
 /**
  * Vrne vsa obvestila (admin pogled) z imenom sobe in številom prebranih.
  */
-export async function pridobiAdminObvestila() {
+export async function pridobiAdminObvestila(signal) {
   const { data, error } = await supabase
     .from('admin_obvestila')
     .select(`
@@ -2002,9 +2034,11 @@ export async function pridobiAdminObvestila() {
       aktivno,
       ustvarjeno_ob,
       sobe (ime_sobe),
-      prebrana_obvestila (id)
+      prebrana_obvestila (count)
     `)
-    .order('ustvarjeno_ob', { ascending: false });
+    .order('ustvarjeno_ob', { ascending: false })
+    .order('id', { ascending: false })
+    .abortSignal(signal);
   if (error) throw new Error(error.message);
   return data ?? [];
 }

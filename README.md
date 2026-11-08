@@ -7,12 +7,16 @@ Web app za vodenje stroškov stanovanj (admin + najemnik) z bazo na Supabase.
 - Backend: Supabase (Postgres, Auth, Edge Functions)
 
 ## Lokalni zagon
-1. `npm install`
+Potrebuješ Node.js 22.12 ali novejši.
+
+1. `npm ci`
 2. Kopiraj `.env.example` v `.env`
 3. Nastavi:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
 4. `npm run dev`
+
+Preverjanje: `npm test`, `npm run build` in `npm audit`.
 
 ## Varnost pred prvim push
 - Nikoli ne pushaj `.env` ali `SUPABASE_SERVICE_ROLE_KEY`.

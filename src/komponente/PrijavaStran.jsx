@@ -5,11 +5,11 @@
  * Logika:
  *   - Največ MAX_POSKUSI napačnih prijav → začasna blokada
  *   - Supabase avtentikacija prek storitve `prijava()`
- *   - Obvestila prek Alert in Snackbar
+ *   - Obvestila prek skupnih toast obvestil
  */
-import { useState } from 'react';
+import { useObvestila } from '../kontekst/ObvestilaKontekst';
+import { useEffect, useState } from 'react';
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -17,7 +17,6 @@ import {
   IconButton,
   InputAdornment,
   Paper,
-  Snackbar,
   Stack,
   TextField,
   Typography,
@@ -33,27 +32,32 @@ const MAX_POSKUSI = 5;
 const ZAKLEP_SEKUNDE = 15;
 
 export default function PrijavaStran() {
+  const { napaka: prikaziNapako, info: prikaziInfo } = useObvestila();
   const { prijavaInfo, pocistiPrijavaInfo } = useAvtentikacija();
   const [email, setEmail] = useState('');
   const [geslo, setGeslo] = useState('');
   const [gesloVidno, setGesloVidno] = useState(false);
   const [nalaganje, setNalaganje] = useState(false);
-  const [napaka, setNapaka] = useState('');
   const [poskusi, setPoskusi] = useState(0);
   const [zaklepDo, setZaklepDo] = useState(null);
 
   const trenutnoZaklenjeno = zaklepDo && Date.now() < zaklepDo;
+
+  useEffect(() => {
+    if (!prijavaInfo) return;
+    prikaziInfo(prijavaInfo);
+    pocistiPrijavaInfo();
+  }, [prijavaInfo, prikaziInfo, pocistiPrijavaInfo]);
 
   async function oddaj(e) {
     e.preventDefault();
 
     if (trenutnoZaklenjeno) {
       const sekunde = Math.ceil((zaklepDo - Date.now()) / 1000);
-      setNapaka(`Prijava je začasno zaklenjena. Počakajte ${sekunde}s.`);
+      prikaziNapako(`Prijava je začasno zaklenjena. Počakajte ${sekunde}s.`);
       return;
     }
 
-    setNapaka('');
     pocistiPrijavaInfo();
     setNalaganje(true);
 
@@ -68,9 +72,9 @@ export default function PrijavaStran() {
       if (noviPoskusi >= MAX_POSKUSI) {
         setZaklepDo(Date.now() + ZAKLEP_SEKUNDE * 1000);
         setPoskusi(0);
-        setNapaka(`Preveč neuspešnih prijav. Sistem je zaklenjen ${ZAKLEP_SEKUNDE} sekund.`);
+        prikaziNapako(`Preveč neuspešnih prijav. Sistem je zaklenjen ${ZAKLEP_SEKUNDE} sekund.`);
       } else {
-        setNapaka(err.message || 'Prijava ni uspela.');
+        prikaziNapako(err.message || 'Prijava ni uspela.');
       }
     } finally {
       setNalaganje(false);
@@ -87,7 +91,13 @@ export default function PrijavaStran() {
 
           {/* ── Logo / Zgornja glava ── */}
           <Box>
-            <Stack direction="row" alignItems="center" spacing={1.5} mb={1}>
+            <Stack
+              direction="row"
+              spacing={1.5}
+              sx={{
+                alignItems: "center",
+                mb: 1
+              }}>
               {/* Barvit kvadrat namesto monokromatske ikone */}
               <Box
                 sx={{
@@ -103,27 +113,36 @@ export default function PrijavaStran() {
               >
                 <HomeOutlinedIcon sx={{ fontSize: 20, color: '#fff' }} />
               </Box>
-              <Typography variant="h6" fontWeight={700} color="text.primary">
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 700,
+                  color: "text.primary"
+                }}>
                 Sobe Dovč
               </Typography>
             </Stack>
 
-            <Typography variant="h4" fontWeight={800} color="text.primary" lineHeight={1.15}>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 800,
+                color: "text.primary",
+                lineHeight: 1.15
+              }}>
               Dobrodošli nazaj
             </Typography>
-            <Typography variant="body2" color="text.secondary" mt={0.5}>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "text.secondary",
+                mt: 0.5
+              }}>
               Vpišite vaše podatke za dostop do sistema.
             </Typography>
           </Box>
 
           <Divider />
-
-          {/* ── Obvestilo ob predhodni akciji (reset gesla ipd.) ── */}
-          {prijavaInfo && (
-            <Alert severity="info" variant="outlined" sx={{ borderRadius: '6px' }}>
-              {prijavaInfo}
-            </Alert>
-          )}
 
           {/* ── Email polje ── */}
           <Stack spacing={2}>
@@ -135,12 +154,14 @@ export default function PrijavaStran() {
               required
               autoComplete="email"
               fullWidth
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <EmailOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                  </InputAdornment>
-                ),
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <EmailOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                    </InputAdornment>
+                  ),
+                }
               }}
             />
 
@@ -153,22 +174,24 @@ export default function PrijavaStran() {
               required
               autoComplete="current-password"
               fullWidth
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      size="small"
-                      onClick={() => setGesloVidno((p) => !p)}
-                      edge="end"
-                      tabIndex={-1}
-                      sx={{ color: 'text.secondary' }}
-                    >
-                      {gesloVidno
-                        ? <VisibilityOffIcon fontSize="small" />
-                        : <VisibilityIcon fontSize="small" />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        size="small"
+                        onClick={() => setGesloVidno((p) => !p)}
+                        edge="end"
+                        tabIndex={-1}
+                        sx={{ color: 'text.secondary' }}
+                      >
+                        {gesloVidno
+                          ? <VisibilityOffIcon fontSize="small" />
+                          : <VisibilityIcon fontSize="small" />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }
               }}
             />
           </Stack>
@@ -195,22 +218,6 @@ export default function PrijavaStran() {
         </Stack>
       </Paper>
 
-      {/* ── Snackbar za napake ── */}
-      <Snackbar
-        open={Boolean(napaka)}
-        autoHideDuration={5000}
-        onClose={() => setNapaka('')}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          severity="error"
-          onClose={() => setNapaka('')}
-          variant="filled"
-          sx={{ borderRadius: '6px', minWidth: 300 }}
-        >
-          {napaka}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }

@@ -70,19 +70,29 @@ export default function ObvestiloModal({ obvestila, uporabnikId, onVsaPrebrana }
       open
       maxWidth="sm"
       fullWidth
-      disableEscapeKeyDown
-      onClose={() => {}} // preprečimo zaprtje s klikom zunaj
-      PaperProps={{ sx: { borderRadius: 2 } }}
+      onClose={() => {}} // Obvestilo potrdi uporabnik; Escape in klik zunaj ga ne zapreta.
+      slotProps={{
+        paper: { sx: { borderRadius: 2 } }
+      }}
     >
       <DialogTitle sx={{ pb: 1 }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row" spacing={1} sx={{
+          alignItems: "center"
+        }}>
           <CampaignOutlinedIcon sx={{ color: 'primary.main', fontSize: 22 }} />
-          <Typography variant="h6" fontWeight={700} sx={{ flex: 1 }}>
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: 700,
+              flex: 1
+            }}>
             Obvestilo
           </Typography>
           {/* Korakovnik – prikazan samo kadar je več kot 1 obvestilo */}
           {!jeEno && (
-            <Stack direction="row" alignItems="center" spacing={0.5}>
+            <Stack direction="row" spacing={0.5} sx={{
+              alignItems: "center"
+            }}>
               <IconButton
                 size="small"
                 onClick={() => pojdiNa(indeks - 1)}
@@ -92,9 +102,11 @@ export default function ObvestiloModal({ obvestila, uporabnikId, onVsaPrebrana }
               </IconButton>
               <Typography
                 variant="caption"
-                fontWeight={700}
-                sx={{ minWidth: 36, textAlign: 'center' }}
-              >
+                sx={{
+                  fontWeight: 700,
+                  minWidth: 36,
+                  textAlign: 'center'
+                }}>
                 {indeks + 1} / {skupaj}
               </Typography>
               <IconButton
@@ -112,7 +124,13 @@ export default function ObvestiloModal({ obvestila, uporabnikId, onVsaPrebrana }
       <DialogContent dividers>
         {/* Navigacijske pike za orientacijo */}
         {!jeEno && (
-          <Stack direction="row" spacing={0.5} justifyContent="center" mb={1.5}>
+          <Stack
+            direction="row"
+            spacing={0.5}
+            sx={{
+              justifyContent: "center",
+              mb: 1.5
+            }}>
             {seznam.map((o, i) => (
               <Box
                 key={o.id}
@@ -146,7 +164,12 @@ export default function ObvestiloModal({ obvestila, uporabnikId, onVsaPrebrana }
 
       <DialogActions sx={{ px: 2.5, py: 1.5, gap: 1 }}>
         {!jeEno && (
-          <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+          <Typography
+            variant="caption"
+            sx={{
+              color: "text.secondary",
+              flex: 1
+            }}>
             {skupaj - 1 > 0 ? `Še ${skupaj - 1} neprebranih` : ''}
           </Typography>
         )}

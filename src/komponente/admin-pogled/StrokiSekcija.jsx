@@ -3,9 +3,9 @@
  * Splošni stroški, ki niso vezani na obračune najemnikov - le na hišo/sobo za pregled.
  * Podpira opcijski opis, datum stroška in razčlenitev na postavke (pod-vnosi).
  */
+import { useObvestila } from '../../kontekst/ObvestilaKontekst';
 import { useMemo, useState } from 'react';
 import {
-  Alert,
   Box,
   Button,
   Card,
@@ -21,36 +21,35 @@ import {
   Stack,
   TextField,
   Tooltip,
-  Typography
+  Typography,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
-import { DataGrid } from '@mui/x-data-grid';
+import DataGrid from './AdminDataGrid';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
-import AddCircleOutlineOutlinedIcon from '@mui/icons-material/AddCircleOutlineOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import EuroSymbolOutlinedIcon from '@mui/icons-material/EuroSymbolOutlined';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import RemoveCircleOutlineOutlinedIcon from '@mui/icons-material/RemoveCircleOutlineOutlined';
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined';
 import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import CloseIcon from '@mui/icons-material/Close';
 import SearchableSelect from '../SearchableSelect';
 import {
   ADMIN_DATAGRID_FLEKS_SX,
-  ADMIN_SEKCIJA_CARD_SX,
-  ADMIN_SEKCIJA_CONTENT_SX,
-  ADMIN_SEKCIJA_STACK_SX,
+  ADMIN_DIALOG_CONTENT_SX,
+  ADMIN_DIALOG_ACTIONS_SX,
+  ADMIN_KOMPAKTNA_POLJA_SX as KOMPAKTEN_SLOG_POLJ,
+  ADMIN_TABELA_CARD_SX,
+  ADMIN_TABELA_CONTENT_SX,
+  ADMIN_TABELA_STACK_SX,
   ADMIN_TABELA_FLEKS_SX
 } from './adminSekcijaPostavitev';
 
-const KOMPAKTEN_SLOG_POLJ = {
-  '& .MuiInputLabel-root': { fontSize: '0.8rem' },
-  '& .MuiInputLabel-root.MuiInputLabel-shrink': { fontSize: '0.74rem' },
-  '& .MuiInputBase-input': { fontSize: '0.82rem' },
-  '& .MuiFormHelperText-root': { fontSize: '0.72rem' },
-  '& .MuiButton-root': { fontSize: '0.76rem' }
-};
 
 const PRAZNA_POSTAVKA = { opis: '', znesek: '' };
 
@@ -76,9 +75,11 @@ export default function StrokiSekcija({
   moznostiStrani,
   lokalizacijaMreze
 }) {
+  const tema = useTheme();
+  const jeMobilen = useMediaQuery(tema.breakpoints.down('sm'));
+  const { napaka: prikaziNapako } = useObvestila();
   const [dialogOdprt, setDialogOdprt] = useState(false);
   const [shranjujem, setShranjujem] = useState(false);
-  const [napaka, setNapaka] = useState('');
   const [novStrosek, setNovStrosek] = useState(PRAZEN_STROSEK);
 
   // detail modals
@@ -118,12 +119,12 @@ export default function StrokiSekcija({
         return (
           <Stack
             spacing={0.15}
-            justifyContent="center"
             onClick={imaPostavkeVrstica ? (e) => {
               e.stopPropagation();
               setPostavkeModal({ strosek: params.row.strosek, postavke, znesek: params.row.znesek });
             } : undefined}
             sx={{
+              justifyContent: "center",
               height: '100%',
               py: 0.5,
               px: 0.5,
@@ -131,8 +132,7 @@ export default function StrokiSekcija({
               cursor: imaPostavkeVrstica ? 'pointer' : 'default',
               transition: 'background 0.15s',
               '&:hover': imaPostavkeVrstica ? { bgcolor: 'action.hover' } : {}
-            }}
-          >
+            }}>
             <Typography sx={{ fontSize: '0.82rem', fontWeight: 600, lineHeight: 1.3 }} noWrap>
               {params.value}
             </Typography>
@@ -225,13 +225,11 @@ export default function StrokiSekcija({
   }, [stolpciDinamicni, izbrisiStrosekVrstico]);
 
   function odpriDialog() {
-    setNapaka('');
     setNovStrosek(PRAZEN_STROSEK);
     setDialogOdprt(true);
   }
 
   function urediStrosek(vrstica) {
-    setNapaka('');
     setNovStrosek({
       id: vrstica.id,
       strosek: vrstica.strosek ?? '',
@@ -288,10 +286,9 @@ export default function StrokiSekcija({
   }
 
   async function potrdiDodajStrosek() {
-    setNapaka('');
 
     if (!novStrosek.strosek.trim()) {
-      setNapaka('Strošek je obvezen.');
+      prikaziNapako('Strošek je obvezen.');
       return;
     }
 
@@ -301,14 +298,14 @@ export default function StrokiSekcija({
       for (const p of postavke) {
         const z = Number(p.znesek);
         if (!Number.isFinite(z) || z < 0) {
-          setNapaka('Znesek vsake postavke mora biti 0 ali več.');
+          prikaziNapako('Znesek vsake postavke mora biti 0 ali več.');
           return;
         }
       }
     } else {
       const znesek = Number(novStrosek.znesek);
       if (!Number.isFinite(znesek) || znesek < 0) {
-        setNapaka('Znesek mora biti 0 ali več.');
+        prikaziNapako('Znesek mora biti 0 ali več.');
         return;
       }
     }
@@ -331,42 +328,53 @@ export default function StrokiSekcija({
       });
       setDialogOdprt(false);
     } catch (err) {
-      setNapaka(err?.message || 'Stroška ni bilo mogoče shraniti.');
+      prikaziNapako(err?.message || 'Stroška ni bilo mogoče shraniti.');
     } finally {
       setShranjujem(false);
     }
   }
 
   return (
-    <Card className="kartica-jeklo" sx={ADMIN_SEKCIJA_CARD_SX}>
-      <CardContent sx={ADMIN_SEKCIJA_CONTENT_SX}>
-        <Stack spacing={1.5} sx={ADMIN_SEKCIJA_STACK_SX}>
+    <Card className="kartica-jeklo" sx={ADMIN_TABELA_CARD_SX}>
+      <CardContent sx={ADMIN_TABELA_CONTENT_SX}>
+        <Stack spacing={1.5} sx={ADMIN_TABELA_STACK_SX}>
           {/* Glava sekcije */}
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
-            justifyContent="space-between"
-            alignItems={{ xs: 'flex-start', sm: 'center' }}
-            gap={1}
-          >
+            sx={{
+              justifyContent: "space-between",
+              alignItems: { xs: 'flex-start', sm: 'center' },
+              gap: 1
+            }}>
             <Box>
-              <Stack direction="row" alignItems="center" gap={1.5} flexWrap="wrap">
+              <Stack
+                direction="row"
+                sx={{
+                  alignItems: "center",
+                  gap: 1.5,
+                  flexWrap: "wrap"
+                }}>
                 <Typography variant="h5">Stroški</Typography>
+                <Tooltip title="Splošni stroški, neodvisni od obračunov najemnikov. Hiša in soba sta neobvezni.">
+                  <IconButton type="button" size="small" aria-label="Informacije o stroških">
+                    <InfoOutlinedIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
                 <Chip size="small" color="primary" label={`${(vrsticeStroski ?? []).length} stroškov`} />
                 <Chip size="small" color="success" label={`Skupaj: ${skupajZnesek.toFixed(2)} €`} />
               </Stack>
-              <Typography variant="body2" color="text.secondary" mt={0.25}>
-                Splošni stroški, neodvisni od obračunov najemnikov. Hiša in soba sta neobvezni.
-              </Typography>
             </Box>
-            <Stack direction="row" gap={1}>
+            <Stack direction="row" sx={{
+              gap: 1
+            }}>
               <Button
-                variant="outlined"
+                variant="contained"
                 size="small"
                 color="primary"
-                startIcon={<AddCircleOutlineOutlinedIcon />}
+                startIcon={<AddOutlinedIcon />} aria-label="Dodaj strošek" title="Dodaj strošek"
                 onClick={odpriDialog}
               >
-                Dodaj strošek
+                Dodaj
               </Button>
               <Button
                 variant="outlined"
@@ -374,7 +382,7 @@ export default function StrokiSekcija({
                 startIcon={<FileDownloadOutlinedIcon />}
                 onClick={izvoziStrokiXlsx}
               >
-                Izvozi XLSX
+                XLSX
               </Button>
             </Stack>
           </Stack>
@@ -417,17 +425,19 @@ export default function StrokiSekcija({
         maxWidth="sm"
       >
         <DialogTitle>
-          <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack direction="row" spacing={1} sx={{
+            alignItems: "center"
+          }}>
             <NotesOutlinedIcon sx={{ fontSize: 20, color: '#64748b' }} />
             <Typography variant="h6" component="span">{opisModal?.strosek}</Typography>
           </Stack>
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent dividers sx={ADMIN_DIALOG_CONTENT_SX}>
           <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
             {opisModal?.opis}
           </Typography>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={ADMIN_DIALOG_ACTIONS_SX}>
           <Button onClick={() => setOpisModal(null)}>Zapri</Button>
         </DialogActions>
       </Dialog>
@@ -440,7 +450,9 @@ export default function StrokiSekcija({
         maxWidth="xs"
       >
         <DialogTitle>
-          <Stack direction="row" alignItems="center" spacing={1}>
+          <Stack direction="row" spacing={1} sx={{
+            alignItems: "center"
+          }}>
             <ListAltOutlinedIcon sx={{ fontSize: 20, color: '#64748b' }} />
             <Typography variant="h6" component="span">{postavkeModal?.strosek}</Typography>
           </Stack>
@@ -454,12 +466,16 @@ export default function StrokiSekcija({
                 <Stack
                   key={i}
                   direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  sx={{ px: 2.5, py: 1 }}
-                >
+                  sx={{
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    px: 2.5,
+                    py: 1
+                  }}>
                   <Typography sx={{ fontSize: '0.85rem' }}>{p.opis}</Typography>
-                  <Stack direction="row" spacing={0.4} alignItems="center">
+                  <Stack direction="row" spacing={0.4} sx={{
+                    alignItems: "center"
+                  }}>
                     <EuroSymbolOutlinedIcon sx={{ fontSize: 12, color: '#059669' }} />
                     <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#059669' }}>
                       {Number(p.znesek ?? 0).toFixed(2)}
@@ -471,12 +487,17 @@ export default function StrokiSekcija({
           <Divider />
           <Stack
             direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-            sx={{ px: 2.5, py: 1.25, bgcolor: '#f8fafc' }}
-          >
+            sx={{
+              justifyContent: "space-between",
+              alignItems: "center",
+              px: 2.5,
+              py: 1.25,
+              bgcolor: '#f8fafc'
+            }}>
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700 }}>Skupaj</Typography>
-            <Stack direction="row" spacing={0.4} alignItems="center">
+            <Stack direction="row" spacing={0.4} sx={{
+              alignItems: "center"
+            }}>
               <EuroSymbolOutlinedIcon sx={{ fontSize: 13, color: '#059669' }} />
               <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: '#059669' }}>
                 {Number(postavkeModal?.znesek ?? 0).toFixed(2)}
@@ -484,7 +505,7 @@ export default function StrokiSekcija({
             </Stack>
           </Stack>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={ADMIN_DIALOG_ACTIONS_SX}>
           <Button onClick={() => setPostavkeModal(null)}>Zapri</Button>
         </DialogActions>
       </Dialog>
@@ -495,22 +516,28 @@ export default function StrokiSekcija({
         onClose={() => {
           if (!shranjujem) setDialogOdprt(false);
         }}
+        fullScreen={jeMobilen}
         fullWidth
         maxWidth="sm"
+        aria-labelledby="strosek-dialog-naslov"
+        slotProps={{ paper: { sx: {
+          maxHeight: jeMobilen ? '100dvh' : 'calc(100dvh - 48px)',
+          ...(jeMobilen && { borderRadius: 0 })
+        } } }}
       >
-        <DialogTitle>{novStrosek.id ? 'Uredi strošek' : 'Dodaj strošek'}</DialogTitle>
-        <DialogContent dividers>
+        <DialogTitle id="strosek-dialog-glava" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, py: 1.5 }}>
+          <Stack direction="row" sx={{ alignItems: 'center', gap: 0.5 }}>
+            <Typography id="strosek-dialog-naslov" component="span" variant="h6">{novStrosek.id ? 'Uredi strošek' : 'Dodaj strošek'}</Typography>
+            <Tooltip title="Vnesi naziv stroška. Opis, datum, hiša in soba so neobvezni." arrow>
+              <IconButton type="button" size="small" aria-label="Informacije o vnosu stroška">
+                <InfoOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+          <IconButton aria-label="Zapri obrazec" onClick={() => setDialogOdprt(false)} disabled={shranjujem}><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={ADMIN_DIALOG_CONTENT_SX}>
           <Stack spacing={1.5} sx={KOMPAKTEN_SLOG_POLJ}>
-            <Typography variant="body2" color="text.secondary">
-              Vnesi naziv stroška. Opis, datum, hiša in soba so neobvezni.
-            </Typography>
-
-            {napaka && (
-              <Alert severity="error" onClose={() => setNapaka('')}>
-                {napaka}
-              </Alert>
-            )}
-
             {/* Naziv */}
             <TextField
               label="Naziv stroška"
@@ -532,7 +559,9 @@ export default function StrokiSekcija({
               multiline
               minRows={2}
               placeholder="Daljši opis, opombe, izvajalec…"
-              inputProps={{ maxLength: 2000 }}
+              slotProps={{
+                htmlInput: { maxLength: 2000 }
+              }}
             />
 
             {/* Datum stroška */}
@@ -578,17 +607,28 @@ export default function StrokiSekcija({
             {/* Postavke ali skupni znesek */}
             {imaPostavke ? (
               <Stack spacing={1}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="body2" fontWeight={600}>
+                <Stack
+                  direction="row"
+                  sx={{
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}>
+                  <Typography variant="body2" sx={{
+                    fontWeight: 600
+                  }}>
                     Postavke
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" fontVariantNumeric="tabular-nums">
+                  <Typography variant="body2" fontVariantNumeric="tabular-nums" sx={{
+                    color: "text.secondary"
+                  }}>
                     Skupaj: <strong>{znesekIzPostavk.toFixed(2)} €</strong>
                   </Typography>
                 </Stack>
 
                 {novStrosek.postavke.map((p, i) => (
-                  <Stack key={i} direction="row" spacing={0.75} alignItems="flex-start">
+                  <Stack key={i} direction="row" spacing={0.75} sx={{
+                    alignItems: "flex-start"
+                  }}>
                     <TextField
                       label={`Postavka ${i + 1}`}
                       value={p.opis}
@@ -598,21 +638,22 @@ export default function StrokiSekcija({
                       placeholder="npr. Miza"
                     />
                     <TextField
-                      label="€"
                       type="number"
                       value={p.znesek}
                       onChange={(e) => spremeniPostavko(i, 'znesek', e.target.value)}
                       size="small"
                       sx={{ width: 90 }}
-                      inputProps={{ min: 0, step: '0.01' }}
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <EuroSymbolOutlinedIcon sx={{ fontSize: '0.85rem' }} />
-                          </InputAdornment>
-                        )
-                      }}
-                    />
+                      slotProps={{
+                        input: {
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <EuroSymbolOutlinedIcon sx={{ fontSize: '0.85rem' }} />
+                            </InputAdornment>
+                          )
+                        },
+
+                        htmlInput: { min: 0, step: '0.01', 'aria-label': `Znesek postavke ${i + 1}` }
+                      }} />
                     <Tooltip title="Odstrani postavko">
                       <IconButton
                         size="small"
@@ -626,14 +667,16 @@ export default function StrokiSekcija({
                   </Stack>
                 ))}
 
-                <Stack direction="row" gap={1}>
+                <Stack direction="row" sx={{
+                  gap: 1
+                }}>
                   <Button
                     size="small"
                     startIcon={<AddOutlinedIcon />}
                     onClick={dodajPostavko}
                     variant="outlined"
                   >
-                    Dodaj postavko
+                    Dodaj
                   </Button>
                   <Button
                     size="small"
@@ -654,15 +697,17 @@ export default function StrokiSekcija({
                   size="small"
                   fullWidth
                   required
-                  inputProps={{ min: 0, step: '0.01' }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} />
-                      </InputAdornment>
-                    )
-                  }}
-                />
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <EuroSymbolOutlinedIcon sx={{ fontSize: '1rem' }} />
+                        </InputAdornment>
+                      )
+                    },
+
+                    htmlInput: { min: 0, step: '0.01' }
+                  }} />
                 <Button
                   size="small"
                   startIcon={<AddOutlinedIcon />}
@@ -676,17 +721,18 @@ export default function StrokiSekcija({
             )}
           </Stack>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={ADMIN_DIALOG_ACTIONS_SX}>
           <Button onClick={() => setDialogOdprt(false)} disabled={shranjujem}>
             Prekliči
           </Button>
           <Button
             variant="contained"
             className="gumb-jeklo"
+            startIcon={!shranjujem && !novStrosek.id ? <AddOutlinedIcon /> : undefined}
             onClick={potrdiDodajStrosek}
             disabled={shranjujem}
           >
-            {shranjujem ? 'Shranjujem...' : novStrosek.id ? 'Shrani spremembe' : 'Dodaj strošek'}
+            {shranjujem ? 'Shranjujem...' : novStrosek.id ? 'Shrani spremembe' : 'Dodaj'}
           </Button>
         </DialogActions>
       </Dialog>

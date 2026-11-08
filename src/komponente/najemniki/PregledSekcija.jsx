@@ -50,8 +50,6 @@ export default function PregledSekcija({
   sporociloZeOddano,
   predogledStevca,
   setVnosStevca,
-  napakaStevec,
-  uspehStevec,
   shranjevanjeStevca,
   potrjevanjeObracuna,
   potrdiObracun
@@ -125,10 +123,22 @@ export default function PregledSekcija({
     <Stack spacing={2.5}>
       {/* Pozdravna glava */}
       <Box>
-        <Typography variant="h5" fontWeight={800} lineHeight={1.2}>
+        <Typography
+          variant="h5"
+          sx={{
+            fontWeight: 800,
+            lineHeight: 1.2
+          }}>
           Dober dan, {prijavljenNaziv.split(' ')[0]}!
         </Typography>
-        <Stack direction="row" spacing={1} mt={1} flexWrap="wrap" useFlexGap>
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          sx={{
+            mt: 1,
+            flexWrap: "wrap"
+          }}>
           <Chip size="small" color="primary" icon={<HomeWorkOutlinedIcon sx={{ fontSize: 13 }} />} label={`Soba: ${sobaNaziv}`} />
         </Stack>
         {prikaziPogodbo && (
@@ -142,14 +152,21 @@ export default function PregledSekcija({
               background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
             }}
           >
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.75} alignItems={{ xs: 'flex-start', sm: 'center' }}>
-              <Stack direction="row" spacing={0.6} alignItems="center">
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0.75} sx={{
+              alignItems: { xs: 'flex-start', sm: 'center' }
+            }}>
+              <Stack direction="row" spacing={0.6} sx={{
+                alignItems: "center"
+              }}>
                 <CalendarMonthOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                 <Typography
                   variant="caption"
-                  color="text.secondary"
-                  sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}
-                >
+                  sx={{
+                    color: "text.secondary",
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    fontWeight: 700
+                  }}>
                   Veljavnost pogodbe
                 </Typography>
               </Stack>
@@ -164,7 +181,15 @@ export default function PregledSekcija({
       {/* Statistične kartice */}
       {trenutniPrikaz && (
         <Box>
-          <Typography variant="subtitle2" color="text.secondary" mb={1.5} sx={{ textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.7rem' }}>
+          <Typography
+            variant="subtitle2"
+            sx={{
+              color: "text.secondary",
+              mb: 1.5,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              fontSize: '0.7rem'
+            }}>
             Aktualni mesečni stroški
           </Typography>
           <Grid container spacing={1.5}>
@@ -181,7 +206,13 @@ export default function PregledSekcija({
                 <Typography variant="caption" sx={{ opacity: 0.75, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', fontSize: '0.68rem' }}>
                   Skupaj ta mesec
                 </Typography>
-                <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5, letterSpacing: '-0.02em' }}>
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 800,
+                    mt: 0.5,
+                    letterSpacing: '-0.02em'
+                  }}>
                   {denar(trenutniPrikaz.skupaj)}
                 </Typography>
                 <Typography variant="caption" sx={{ opacity: 0.65 }}>
@@ -200,18 +231,29 @@ export default function PregledSekcija({
             <CardContent>
               <Stack spacing={2}>
                 <Box>
-                  <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{
+                      alignItems: "center",
+                      mb: 0.5
+                    }}>
                     <SpeedOutlinedIcon sx={{ color: 'primary.main', fontSize: 20 }} />
                     <Typography variant="h6">Vnos stanja števcev</Typography>
                   </Stack>
                   <Stack spacing={0.75}>
-                    <Stack direction="row" spacing={0.6} alignItems="center">
+                    <Stack direction="row" spacing={0.6} sx={{
+                      alignItems: "center"
+                    }}>
                       <CalendarMonthOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                       <Typography
                         variant="caption"
-                        color="text.secondary"
-                        sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}
-                      >
+                        sx={{
+                          color: "text.secondary",
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          fontWeight: 700
+                        }}>
                         Obračunsko obdobje
                       </Typography>
                     </Stack>
@@ -239,9 +281,17 @@ export default function PregledSekcija({
                 )}
 
                 <Box sx={{ p: 1.5, borderRadius: '8px', border: '1px solid rgba(245,158,11,0.25)', background: 'rgba(245,158,11,0.04)' }}>
-                  <Stack direction="row" alignItems="center" spacing={0.75} mb={1.25}>
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    sx={{
+                      alignItems: "center",
+                      mb: 1.25
+                    }}>
                     <BoltOutlinedIcon sx={{ fontSize: 16, color: '#f59e0b' }} />
-                    <Typography variant="subtitle2" fontWeight={700}>Elektrika</Typography>
+                    <Typography variant="subtitle2" sx={{
+                      fontWeight: 700
+                    }}>Elektrika</Typography>
                   </Stack>
                   <Grid container spacing={1}>
                     <Grid size={6}>
@@ -251,12 +301,16 @@ export default function PregledSekcija({
                         label="Prejšnje stanje"
                         disabled
                         value={predogledStevca.prejsnjeElektrike}
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <Typography variant="caption" color="text.secondary">kWh</Typography>
-                            </InputAdornment>
-                          )
+                        slotProps={{
+                          input: {
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <Typography variant="caption" sx={{
+                                  color: "text.secondary"
+                                }}>kWh</Typography>
+                              </InputAdornment>
+                            )
+                          }
                         }}
                       />
                     </Grid>
@@ -269,18 +323,29 @@ export default function PregledSekcija({
                         disabled={jeOgrevanjeZaklenjeno}
                         value={vnosStevca.stanje_elektrike}
                         onChange={(e) => setVnosStevca((p) => ({ ...p, stanje_elektrike: e.target.value }))}
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <Typography variant="caption" color="text.secondary">kWh</Typography>
-                            </InputAdornment>
-                          )
+                        slotProps={{
+                          input: {
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <Typography variant="caption" sx={{
+                                  color: "text.secondary"
+                                }}>kWh</Typography>
+                              </InputAdornment>
+                            )
+                          }
                         }}
                       />
                     </Grid>
                   </Grid>
                   {predogledStevca.novoElektrike !== null && Number.isFinite(predogledStevca.novoElektrike) && (
-                    <Stack direction="row" spacing={1} mt={1} flexWrap="wrap" useFlexGap>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      useFlexGap
+                      sx={{
+                        mt: 1,
+                        flexWrap: "wrap"
+                      }}>
                       <Chip size="small" color="warning" label={`Poraba: ${predogledStevca.porabaElektrike} kWh`} />
                       <Chip size="small" color="warning" label={`Strošek: ${denar(predogledStevca.strosekElektrike)}`} />
                     </Stack>
@@ -289,9 +354,17 @@ export default function PregledSekcija({
 
                 {imaVodniStevec && (
                   <Box sx={{ p: 1.5, borderRadius: '8px', border: '1px solid rgba(59,130,246,0.25)', background: 'rgba(59,130,246,0.04)' }}>
-                    <Stack direction="row" alignItems="center" spacing={0.75} mb={1.25}>
+                    <Stack
+                      direction="row"
+                      spacing={0.75}
+                      sx={{
+                        alignItems: "center",
+                        mb: 1.25
+                      }}>
                       <WaterDropOutlinedIcon sx={{ fontSize: 16, color: '#3b82f6' }} />
-                      <Typography variant="subtitle2" fontWeight={700}>Voda</Typography>
+                      <Typography variant="subtitle2" sx={{
+                        fontWeight: 700
+                      }}>Voda</Typography>
                       <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 700, ml: 'auto' }}>
                         Ločilo je pika (.)
                       </Typography>
@@ -304,7 +377,11 @@ export default function PregledSekcija({
                           label="Prejšnje stanje"
                           disabled
                           value={predogledStevca.prejsnjeVode}
-                          InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="caption" color="text.secondary">m³</Typography></InputAdornment> }}
+                          slotProps={{
+                            input: { endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{
+                              color: "text.secondary"
+                            }}>m³</Typography></InputAdornment> }
+                          }}
                         />
                       </Grid>
                       <Grid size={6}>
@@ -313,16 +390,27 @@ export default function PregledSekcija({
                           size="small"
                           label="Novo stanje *"
                           type="number"
-                          inputProps={{ min: 0, step: '0.001' }}
                           disabled={jeOgrevanjeZaklenjeno}
                           value={vnosStevca.stanje_vode}
                           onChange={(e) => setVnosStevca((p) => ({ ...p, stanje_vode: e.target.value }))}
-                          InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="caption" color="text.secondary">m³</Typography></InputAdornment> }}
-                        />
+                          slotProps={{
+                            input: { endAdornment: <InputAdornment position="end"><Typography variant="caption" sx={{
+                              color: "text.secondary"
+                            }}>m³</Typography></InputAdornment> },
+
+                            htmlInput: { min: 0, step: '0.001' }
+                          }} />
                       </Grid>
                     </Grid>
                     {predogledStevca.novoVode !== null && Number.isFinite(predogledStevca.novoVode) && (
-                      <Stack direction="row" spacing={1} mt={1} flexWrap="wrap" useFlexGap>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        useFlexGap
+                        sx={{
+                          mt: 1,
+                          flexWrap: "wrap"
+                        }}>
                         <Chip size="small" color="info" label={`Poraba: ${predogledStevca.porabaVode} m³`} />
                         <Chip size="small" color="info" label={`Strošek: ${denar(predogledStevca.strosekVode)}`} />
                       </Stack>
@@ -330,8 +418,6 @@ export default function PregledSekcija({
                   </Box>
                 )}
 
-                {napakaStevec && <Alert severity="error">{napakaStevec}</Alert>}
-                {uspehStevec && <Alert severity="success">{uspehStevec}</Alert>}
 
                 <Button
                   type="button"
@@ -354,7 +440,13 @@ export default function PregledSekcija({
           <Card className="kartica-jeklo" sx={{ height: '100%' }}>
             <CardContent>
               <Stack spacing={0.25}>
-                <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{
+                    alignItems: "center",
+                    mb: 1.5
+                  }}>
                   <ReceiptOutlinedIcon sx={{ color: 'primary.main', fontSize: 20 }} />
                   <Typography variant="h6">Razčlenitev stroškov</Typography>
                 </Stack>
@@ -397,8 +489,15 @@ export default function PregledSekcija({
                         border: '1px solid rgba(15,23,42,0.09)'
                       }}
                     >
-                      <Typography variant="subtitle1" fontWeight={700}>SKUPAJ</Typography>
-                      <Typography variant="h5" fontWeight={800} color="primary.main">
+                      <Typography variant="subtitle1" sx={{
+                        fontWeight: 700
+                      }}>SKUPAJ</Typography>
+                      <Typography
+                        variant="h5"
+                        sx={{
+                          fontWeight: 800,
+                          color: "primary.main"
+                        }}>
                         {denar(trenutniPrikaz.skupaj)}
                       </Typography>
                     </Box>
@@ -469,7 +568,9 @@ export default function PregledSekcija({
                     <strong>{v.vrsta}:</strong> izračunani strošek je <strong>{denar(v.znesek)}</strong> — ali ste prepričani, da je vnos pravilen?
                   </Alert>
                 ))}
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" sx={{
+                  color: "text.secondary"
+                }}>
                   Če so podatki pravilni, lahko nadaljujete.
                 </Typography>
               </>

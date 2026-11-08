@@ -124,10 +124,6 @@ body {
 }
 
 /* ── Tabele ──────────────────────────────────────────── */
-.tabela-polna {
-  height: min(62vh, 640px);
-}
-
 .tabela-polna .MuiDataGrid-root {
   border-color: var(--border);
   background: #ffffff;
@@ -240,16 +236,7 @@ body {
 
 /* ── Mobilne prilagoditve ─────────────────────────────── */
 @media (max-width: 900px) {
-  .tabela-polna {
-    height: 400px;
-  }
   :root {
     --nav-w: 100%;
-  }
-}
-
-@media (max-width: 600px) {
-  .tabela-polna {
-    height: 340px;
   }
 }

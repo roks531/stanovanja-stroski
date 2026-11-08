@@ -30,7 +30,9 @@ export default function PotrditveniDialog({
       fullWidth
     >
       <DialogTitle sx={{ pb: 1.25 }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row" spacing={1} sx={{
+          alignItems: "center"
+        }}>
           <WarningAmberRoundedIcon sx={{ color: '#d97706' }} />
           <Typography variant="h6" component="span" sx={{ fontWeight: 700 }}>
             {naslov}
@@ -42,7 +44,9 @@ export default function PotrditveniDialog({
         <Stack spacing={1}>
           {sporocilo && <Typography>{sporocilo}</Typography>}
           {opomba && (
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{
+              color: "text.secondary"
+            }}>
               {opomba}
             </Typography>
           )}

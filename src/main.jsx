@@ -17,6 +17,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { AvtentikacijaProvider } from './kontekst/AvtentikacijaKontekst';
 import tema from './tema';
+import { ObvestilaProvider } from './kontekst/ObvestilaKontekst';
 import App from './App';
 import './styles.css';
 import 'dayjs/locale/sl';
@@ -41,11 +42,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <CssBaseline />
         {/* Slovenščina za datum/ura komponente (dd.MM.YYYY format) */}
         <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="sl">
-          <AvtentikacijaProvider>
-            <BrowserRouter>
-              <App />
-            </BrowserRouter>
-          </AvtentikacijaProvider>
+          <ObvestilaProvider>
+            <AvtentikacijaProvider>
+              <BrowserRouter>
+                <App />
+              </BrowserRouter>
+            </AvtentikacijaProvider>
+          </ObvestilaProvider>
         </LocalizationProvider>
       </ThemeProvider>
     </QueryClientProvider>

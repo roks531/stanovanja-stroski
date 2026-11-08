@@ -11,6 +11,7 @@
  *   - Statusne značke: kvadrataste (borderRadius: 4px)
  *   - Mobilno: vse stack navpično, gumbi full-width
  */
+import { useObvestila } from '../kontekst/ObvestilaKontekst';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Box, CircularProgress, Stack, Typography } from '@mui/material';
 
@@ -97,15 +98,13 @@ function izberiCenoZaObdobje(cene, mesec, leto) {
 }
 
 export default function NajemnikPogled() {
+  const { napaka: prikaziNapako, uspeh: prikaziUspeh } = useObvestila();
   const { seja, profil, odjava } = useAvtentikacija();
   const [nalaganje, setNalaganje] = useState(true);
 
   // ── Neprebrana obvestila admina ───────────────────────────────
   const [neprebrana, setNeprebrana] = useState([]);
   const [modalOdprt, setModalOdprt] = useState(false);
-  const [napaka, setNapaka] = useState('');
-  const [napakaStevec, setNapakaStevec] = useState('');
-  const [uspehStevec, setUspehStevec] = useState('');
   const [shranjevanjeStevca, setShranjevanjeStevca] = useState(false);
   const [potrjevanjeObracuna, setPotrjevanjeObracuna] = useState(false);
   const [paket, setPaket] = useState(null);
@@ -138,7 +137,6 @@ export default function NajemnikPogled() {
 
     async function nalozi() {
       setNalaganje(true);
-      setNapaka('');
       try {
         const data = await pridobiNajemnikPodatke(seja.user.id);
         if (!aktivno) return;
@@ -146,7 +144,7 @@ export default function NajemnikPogled() {
         setVnosStevca(ustvariVnosStevcaIzObdobja(data?.obdobjeZaVnos));
       } catch (err) {
         if (!aktivno) return;
-        setNapaka(err.message || 'Podatkov ni bilo mogoce naloziti.');
+        prikaziNapako(err.message || 'Podatkov ni bilo mogoce naloziti.');
       } finally {
         if (aktivno) setNalaganje(false);
       }
@@ -442,26 +440,24 @@ export default function NajemnikPogled() {
   }, [izbranRacun, podrobnostiOdprte]);
 
   async function potrdiObracun() {
-    setNapakaStevec('');
-    setUspehStevec('');
 
     if (!paket?.soba?.id) {
-      setNapakaStevec('Soba ni določena.');
+      prikaziNapako('Soba ni določena.');
       return;
     }
 
     if (jeOgrevanjeZaklenjeno) {
-      setNapakaStevec(sporociloZaklepaOgrevanja);
+      prikaziNapako(sporociloZaklepaOgrevanja);
       return;
     }
 
     if (jeObdobjeZeOddano) {
-      setNapakaStevec(sporociloZeOddano);
+      prikaziNapako(sporociloZeOddano);
       return;
     }
 
     if (!predogledStevca.veljavno) {
-      setNapakaStevec(predogledStevca.napakeVnosa[0] || 'Vnos ni veljaven.');
+      prikaziNapako(predogledStevca.napakeVnosa[0] || 'Vnos ni veljaven.');
       return;
     }
 
@@ -505,9 +501,9 @@ export default function NajemnikPogled() {
       const osvezeno = await pridobiNajemnikPodatke(seja.user.id);
       setPaket(osvezeno);
       setVnosStevca(ustvariVnosStevcaIzObdobja(osvezeno?.obdobjeZaVnos));
-      setUspehStevec('Števci so shranjeni, obračun pa uspešno potrjen.');
+      prikaziUspeh('Števci so shranjeni, obračun pa uspešno potrjen.');
     } catch (err) {
-      setNapakaStevec(err.message || 'Števcev in obračuna ni bilo mogoče potrditi.');
+      prikaziNapako(err.message || 'Števcev in obračuna ni bilo mogoče potrditi.');
     } finally {
       setShranjevanjeStevca(false);
       setPotrjevanjeObracuna(false);
@@ -538,9 +534,13 @@ export default function NajemnikPogled() {
           background: '#f1f5f9',
         }}
       >
-        <Stack alignItems="center" spacing={2}>
+        <Stack spacing={2} sx={{
+          alignItems: "center"
+        }}>
           <CircularProgress />
-          <Typography color="text.secondary">Nalaganje podatkov...</Typography>
+          <Typography sx={{
+            color: "text.secondary"
+          }}>Nalaganje podatkov...</Typography>
         </Stack>
       </Box>
     );
@@ -567,12 +567,6 @@ export default function NajemnikPogled() {
         brandPodnaslov="Obračuni"
     >
       <Box sx={{ maxWidth: 860, width: '100%' }}>
-      {/* ── Globalna napaka ── */}
-      {napaka && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setNapaka('')}>
-          {napaka}
-        </Alert>
-      )}
 
       {/* SEKCIJA 0 – PREGLED & VNOS ŠTEVCEV */}
       {sekcija === SEKCIJA_PREGLED && (
@@ -604,8 +598,6 @@ export default function NajemnikPogled() {
           sporociloZeOddano={sporociloZeOddano}
           predogledStevca={predogledStevca}
           setVnosStevca={setVnosStevca}
-          napakaStevec={napakaStevec}
-          uspehStevec={uspehStevec}
           shranjevanjeStevca={shranjevanjeStevca}
           potrjevanjeObracuna={potrjevanjeObracuna}
           potrdiObracun={potrdiObracun}

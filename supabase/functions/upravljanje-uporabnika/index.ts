@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.90.1';
+import { createClient } from 'npm:@supabase/supabase-js@2.119.0';
 
 type Vhod = {
   id?: string;
@@ -303,9 +303,9 @@ Deno.serve(async (req) => {
         .select('aktiven, uporabnik_do')
         .eq('id', uporabnikId)
         .maybeSingle();
-      profil = fallback.data as
-        | { aktiven: boolean; uporabnik_do: string | null; zacetno_stanje_elektrike?: null; zacetno_stanje_vode?: null }
-        | null;
+      profil = fallback.data
+        ? { ...fallback.data, zacetno_stanje_elektrike: null, zacetno_stanje_vode: null }
+        : null;
       napakaProfila = fallback.error;
     }
 

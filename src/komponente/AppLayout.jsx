@@ -14,9 +14,9 @@
  *   children – vsebina desnega dela
  *   onOdjava – povratni klic za odjavo
  */
+import { useObvestila } from '../kontekst/ObvestilaKontekst';
 import { useState } from 'react';
 import {
-  Alert,
   Avatar,
   Box,
   Button,
@@ -83,7 +83,9 @@ function NavItem({ item, aktiven, zlozen, onClick }) {
       </Box>
       {/* Besedilo – vidno samo ko meni ni zloženni */}
       {!zlozen && (
-        <Typography variant="body2" fontWeight={aktiven ? 700 : 500} noWrap>
+        <Typography variant="body2" noWrap sx={{
+          fontWeight: aktiven ? 700 : 500
+        }}>
           {item.label}
         </Typography>
       )}
@@ -169,10 +171,18 @@ function MenuVsebina({
         </Box>
         {!zlozen && (
           <Box>
-            <Typography variant="subtitle2" fontWeight={700} color="text.primary" noWrap>
+            <Typography
+              variant="subtitle2"
+              noWrap
+              sx={{
+                fontWeight: 700,
+                color: "text.primary"
+              }}>
               Sobe Dovč
             </Typography>
-            <Typography variant="caption" color="text.secondary" noWrap>
+            <Typography variant="caption" noWrap sx={{
+              color: "text.secondary"
+            }}>
               {brandPodnaslov ?? 'Administracija'}
             </Typography>
           </Box>
@@ -221,19 +231,21 @@ function MenuVsebina({
               <Box sx={{ minWidth: 0 }}>
                 <Typography
                   variant="caption"
-                  fontWeight={700}
-                  color="text.primary"
-                  display="block"
-                  sx={{ lineHeight: 1.25 }}
-                >
+                  sx={{
+                    fontWeight: 700,
+                    color: "text.primary",
+                    display: "block",
+                    lineHeight: 1.25
+                  }}>
                   {naslov}
                 </Typography>
                 <Typography
                   variant="caption"
-                  color="text.secondary"
-                  display="block"
-                  sx={{ lineHeight: 1.25 }}
-                >
+                  sx={{
+                    color: "text.secondary",
+                    display: "block",
+                    lineHeight: 1.25
+                  }}>
                   {podnaslov}
                 </Typography>
               </Box>
@@ -312,7 +324,9 @@ export default function AppLayout({
   children,
   onOdjava,
   brandPodnaslov,
+  zapolniVisino = false,
 }) {
+  const { napaka: prikaziNapako, uspeh: prikaziUspeh } = useObvestila();
   const { spremeniGeslo } = useAvtentikacija();
   const muiTema = useTheme();
   const jeMobilen = useMediaQuery(muiTema.breakpoints.down('md'));
@@ -323,13 +337,9 @@ export default function AppLayout({
   const [dialogGesloOdprt, setDialogGesloOdprt] = useState(false);
   const [novoGeslo, setNovoGeslo] = useState('');
   const [ponoviGeslo, setPonoviGeslo] = useState('');
-  const [napakaGeslo, setNapakaGeslo] = useState('');
-  const [uspehGeslo, setUspehGeslo] = useState('');
   const [shranjujemGeslo, setShranjujemGeslo] = useState(false);
 
   function odpriDialogGesla() {
-    setNapakaGeslo('');
-    setUspehGeslo('');
     setNovoGeslo('');
     setPonoviGeslo('');
     setDialogGesloOdprt(true);
@@ -342,39 +352,37 @@ export default function AppLayout({
 
   async function shraniNovoGeslo(e) {
     e.preventDefault();
-    setNapakaGeslo('');
-    setUspehGeslo('');
 
     if (!novoGeslo || !ponoviGeslo) {
-      setNapakaGeslo('Obe polji za geslo sta obvezni.');
+      prikaziNapako('Obe polji za geslo sta obvezni.');
       return;
     }
 
     if (novoGeslo.length < 8) {
-      setNapakaGeslo('Geslo mora vsebovati vsaj 8 znakov.');
+      prikaziNapako('Geslo mora vsebovati vsaj 8 znakov.');
       return;
     }
 
     if (novoGeslo !== ponoviGeslo) {
-      setNapakaGeslo('Gesli se ne ujemata.');
+      prikaziNapako('Gesli se ne ujemata.');
       return;
     }
 
     try {
       setShranjujemGeslo(true);
       await spremeniGeslo(novoGeslo);
-      setUspehGeslo('Geslo je bilo uspešno spremenjeno.');
+      prikaziUspeh('Geslo je bilo uspešno spremenjeno.');
       setNovoGeslo('');
       setPonoviGeslo('');
     } catch (err) {
-      setNapakaGeslo(err?.message || 'Gesla ni bilo mogoče spremeniti.');
+      prikaziNapako(err?.message || 'Gesla ni bilo mogoče spremeniti.');
     } finally {
       setShranjujemGeslo(false);
     }
   }
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', background: '#f1f5f9' }}>
+    <Box sx={{ display: 'flex', minHeight: zapolniVisino ? 0 : '100vh', height: zapolniVisino ? '100dvh' : undefined, overflow: zapolniVisino ? 'hidden' : undefined, background: '#f1f5f9' }}>
       {/* === NAMIZNI STRANSKI MENI === */}
       {!jeMobilen && (
         <Box
@@ -437,7 +445,9 @@ export default function AppLayout({
         <Drawer
           open={drawerOdprt}
           onClose={() => setDrawerOdprt(false)}
-          PaperProps={{ sx: { width: NAV_W, border: 'none' } }}
+          slotProps={{
+            paper: { sx: { width: NAV_W, border: 'none' } }
+          }}
         >
           <MenuVsebina
             navigacija={navigacija}
@@ -458,7 +468,7 @@ export default function AppLayout({
       )}
 
       {/* === DESNI VSEBINSKI DEL === */}
-      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {/* Zgornja vrstica (na mobilnem pokaži hamburger) */}
         {jeMobilen && (
           <Box
@@ -492,7 +502,12 @@ export default function AppLayout({
             >
               <HomeOutlinedIcon sx={{ fontSize: 16, color: '#fff' }} />
             </Box>
-            <Typography variant="subtitle2" fontWeight={700} color="text.primary">
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 700,
+                color: "text.primary"
+              }}>
               Sobe Dovč
             </Typography>
             {/* Akcije na desni strani mobilnega headerja */}
@@ -516,7 +531,7 @@ export default function AppLayout({
         )}
 
         {/* Vsebina – otroci */}
-        <Box sx={{ flex: 1, p: { xs: 2, md: 3 }, overflow: 'auto' }}>
+        <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, p: { xs: 2, md: 3 }, overflow: zapolniVisino ? 'hidden' : 'auto', ...(zapolniVisino && { display: 'flex', flexDirection: 'column', '& > .MuiAlert-root': { flexShrink: 0 } }) }}>
           {children}
         </Box>
       </Box>
@@ -526,7 +541,9 @@ export default function AppLayout({
           <DialogTitle>Spremeni geslo</DialogTitle>
           <DialogContent dividers>
             <Stack spacing={1.5} sx={{ pt: 0.5 }}>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{
+                color: "text.secondary"
+              }}>
                 Vnesi novo geslo za svoj račun.
               </Typography>
               <TextField
@@ -547,8 +564,6 @@ export default function AppLayout({
                 fullWidth
                 required
               />
-              {napakaGeslo && <Alert severity="error">{napakaGeslo}</Alert>}
-              {uspehGeslo && <Alert severity="success">{uspehGeslo}</Alert>}
             </Stack>
           </DialogContent>
           <DialogActions>

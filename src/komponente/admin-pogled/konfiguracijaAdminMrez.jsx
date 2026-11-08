@@ -4,6 +4,18 @@
  * Datoteka centralizira statične definicije (stolpci, lokalizacija, konstante),
  * da je `AdminPogled.jsx` krajši in osredotočen na stanje ter akcije.
  */
+import {
+  renderDenarCelica,
+  renderObdobjeCelica,
+  renderSobaCelica,
+  renderElektrikaCelica,
+  renderVodaCelica,
+  renderStrosekEnergijeCelica,
+  renderSkupajCelica,
+  renderStatusCelica,
+  renderDatumiCelica,
+  renderOdcitekCelica,
+} from './adminGridCells';
 import { Box, Chip, IconButton, Link, Stack, Tooltip, Typography } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
@@ -15,7 +27,7 @@ import BoltOutlinedIcon from '@mui/icons-material/BoltOutlined';
 import WaterDropOutlinedIcon from '@mui/icons-material/WaterDropOutlined';
 import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
 import SellOutlinedIcon from '@mui/icons-material/SellOutlined';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 
@@ -56,7 +68,7 @@ function statusPogodbe(pogodbaOd, pogodbaDo) {
 }
 
 const stolpciUporabniki = [
-  { field: 'ime_priimek', headerName: 'Ime in priimek', flex: 0.9, minWidth: 220, maxWidth: 300,
+  { field: 'ime_priimek', headerName: 'Ime in priimek', flex: 0.9, minWidth: 220,
     renderHeader: () => <Box sx={{ whiteSpace: 'normal', lineHeight: 1.3, fontSize: '0.72rem', fontWeight: 600 }}>Ime in<br />priimek</Box>
   },
   {
@@ -64,11 +76,10 @@ const stolpciUporabniki = [
     headerName: 'Kontakt',
     flex: 1,
     minWidth: 240,
-    maxWidth: 360,
     sortable: false,
     renderCell: (params) => (
-      <Stack spacing={0.25} py={0.5}>
-        <Stack direction="row" spacing={0.75} alignItems="center">
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingTop: 4, paddingBottom: 4 }}>
+        <div style={{ display: "flex", flexDirection: "row", gap: 6, alignItems: "center" }}>
           <EmailOutlinedIcon fontSize="inherit" />
           {params.row.email ? (
             <Link
@@ -81,14 +92,14 @@ const stolpciUporabniki = [
               {params.row.email}
             </Link>
           ) : (
-            <Typography variant="body2">-</Typography>
+            <span style={{ display: "block", fontSize: "0.875rem", lineHeight: 1.43, fontWeight: 400 }}>-</span>
           )}
-        </Stack>
-        <Stack direction="row" spacing={0.75} alignItems="center">
+        </div>
+        <div style={{ display: "flex", flexDirection: "row", gap: 6, alignItems: "center" }}>
           <PhoneOutlinedIcon fontSize="inherit" />
-          <Typography variant="body2">{params.row.telefon ?? '-'}</Typography>
-        </Stack>
-      </Stack>
+          <span style={{ display: "block", fontSize: "0.875rem", lineHeight: 1.43, fontWeight: 400 }}>{params.row.telefon ?? '-'}</span>
+        </div>
+      </div>
     )
   },
   { field: 'soba', headerName: 'Soba', width: 80 },
@@ -99,11 +110,11 @@ const stolpciUporabniki = [
     type: 'boolean',
     renderCell: (params) => (
       params.value
-        ? <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.35, px: 0.6, py: 0.15, borderRadius: '4px', background: '#e0f2fe', border: '1px solid #7dd3fc' }}>
+        ? <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2.8, paddingLeft: 4.8, paddingRight: 4.8, paddingTop: 1.2, paddingBottom: 1.2, borderRadius: '4px', background: '#e0f2fe', border: '1px solid #7dd3fc' }}>
             <CheckCircleOutlineIcon sx={{ fontSize: 11, color: '#0284c7' }} />
-            <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: '#075985' }}>da</Typography>
-          </Box>
-        : <Typography sx={{ fontSize: '0.68rem', color: '#94a3b8' }}>—</Typography>
+            <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.5, fontWeight: 700, color: '#075985' }}>da</span>
+          </div>
+        : <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.5, fontWeight: 400, color: '#94a3b8' }}>—</span>
     )
   },
   {
@@ -113,14 +124,14 @@ const stolpciUporabniki = [
     type: 'boolean',
     renderCell: (params) => (
       params.value
-        ? <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.35, px: 0.6, py: 0.15, borderRadius: '4px', background: '#d1fae5', border: '1px solid #a7f3d0' }}>
+        ? <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2.8, paddingLeft: 4.8, paddingRight: 4.8, paddingTop: 1.2, paddingBottom: 1.2, borderRadius: '4px', background: '#d1fae5', border: '1px solid #a7f3d0' }}>
             <CheckCircleOutlineIcon sx={{ fontSize: 11, color: '#059669' }} />
-            <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: '#065f46' }}>aktiven</Typography>
-          </Box>
-        : <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.35, px: 0.6, py: 0.15, borderRadius: '4px', background: '#f1f5f9', border: '1px solid #cbd5e1' }}>
+            <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.5, fontWeight: 700, color: '#065f46' }}>aktiven</span>
+          </div>
+        : <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2.8, paddingLeft: 4.8, paddingRight: 4.8, paddingTop: 1.2, paddingBottom: 1.2, borderRadius: '4px', background: '#f1f5f9', border: '1px solid #cbd5e1' }}>
             <RadioButtonUncheckedIcon sx={{ fontSize: 11, color: '#94a3b8' }} />
-            <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: '#94a3b8' }}>neaktiven</Typography>
-          </Box>
+            <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.5, fontWeight: 600, color: '#94a3b8' }}>neaktiven</span>
+          </div>
     )
   },
   {
@@ -143,36 +154,20 @@ const stolpciUporabniki = [
               : { rob: '#cbd5e1', pika: '#94a3b8' };
 
       return (
-        <Stack spacing={0.1} sx={{ py: 0.2, width: '100%' }}>
-          <Stack direction="row" spacing={0.45} alignItems="center">
-            <Box
-              sx={{
-                width: 7,
-                height: 7,
-                flexShrink: 0,
-                visibility: 'hidden'
-              }}
-            />
-            <Typography sx={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.2 }} noWrap>
+        <div style={{ display: "flex", flexDirection: "column", gap: 0.8, paddingTop: 1.6, paddingBottom: 1.6, width: '100%' }}>
+          <div style={{ display: "flex", flexDirection: "row", gap: 3.6, alignItems: "center" }}>
+            <div style={{ width: 7, height: 7, flexShrink: 0, visibility: 'hidden' }} />
+            <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.2, fontWeight: 400, color: '#64748b', overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               od: {od}
-            </Typography>
-          </Stack>
-          <Stack direction="row" spacing={0.45} alignItems="center">
-            <Box
-              sx={{
-                width: 7,
-                height: 7,
-                borderRadius: '999px',
-                background: statusBarve.pika,
-                border: `1px solid ${statusBarve.rob}`,
-                flexShrink: 0
-              }}
-            />
-            <Typography sx={{ fontSize: '0.68rem', color: '#475569', lineHeight: 1.2 }} noWrap>
+            </span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "row", gap: 3.6, alignItems: "center" }}>
+            <div style={{ width: 7, height: 7, borderRadius: '999px', background: statusBarve.pika, border: `1px solid ${statusBarve.rob}`, flexShrink: 0 }} />
+            <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.2, fontWeight: 400, color: '#475569', overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               do: {doDatuma}
-            </Typography>
-          </Stack>
-        </Stack>
+            </span>
+          </div>
+        </div>
       );
     }
   },
@@ -194,26 +189,26 @@ const stolpciUporabniki = [
       const voda = params.row.zacetno_stanje_vode;
       if (elektrika == null && voda == null) {
         return (
-          <Typography sx={{ fontSize: '0.76rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }} noWrap>
+          <span style={{ display: "block", fontSize: '0.76rem', lineHeight: 1.5, fontWeight: 400, color: '#94a3b8', fontVariantNumeric: 'tabular-nums', overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             —
-          </Typography>
+          </span>
         );
       }
       return (
-        <Stack spacing={0.15} sx={{ py: 0.2, width: '100%' }}>
-          <Stack direction="row" spacing={0.45} alignItems="center">
+        <div style={{ display: "flex", flexDirection: "column", gap: 1.2, paddingTop: 1.6, paddingBottom: 1.6, width: '100%' }}>
+          <div style={{ display: "flex", flexDirection: "row", gap: 3.6, alignItems: "center" }}>
             <BoltOutlinedIcon sx={{ fontSize: 12, color: '#f59e0b', flexShrink: 0 }} />
-            <Typography sx={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.1 }} noWrap>
+            <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.1, fontWeight: 400, color: '#64748b', overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {elektrika == null ? '—' : elektrika}
-            </Typography>
-          </Stack>
-          <Stack direction="row" spacing={0.45} alignItems="center">
+            </span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "row", gap: 3.6, alignItems: "center" }}>
             <WaterDropOutlinedIcon sx={{ fontSize: 12, color: '#3b82f6', flexShrink: 0 }} />
-            <Typography sx={{ fontSize: '0.68rem', color: '#475569', lineHeight: 1.1 }} noWrap>
+            <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.1, fontWeight: 400, color: '#475569', overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {voda == null ? '—' : voda}
-            </Typography>
-          </Stack>
-        </Stack>
+            </span>
+          </div>
+        </div>
       );
     }
   },
@@ -225,23 +220,23 @@ const stolpciUporabniki = [
     sortable: false,
     filterable: false,
     renderCell: (params) => (
-      <Stack spacing={0.25} py={0.4}>
-        <Stack direction="row" alignItems="center" spacing={0.5}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingTop: 3.2, paddingBottom: 3.2 }}>
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 4 }}>
           <CalendarTodayOutlinedIcon sx={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }} />
-          <Typography sx={{ fontSize: '0.72rem', color: '#64748b' }} noWrap>
+          <span style={{ display: "block", fontSize: '0.72rem', lineHeight: 1.5, fontWeight: 400, color: '#64748b', overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {params.row.ustvarjeno_ob ? dayjs(params.row.ustvarjeno_ob).format('DD.MM.YY HH:mm') : '—'}
-          </Typography>
-        </Stack>
+          </span>
+        </div>
         {params.row.posodobljeno_ob && (
-          <Stack direction="row" alignItems="center" spacing={0.5}>
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 4 }}>
             <InfoOutlinedIcon sx={{ fontSize: 11, color: '#0284c7', flexShrink: 0 }} />
-            <Typography sx={{ fontSize: '0.72rem', color: '#64748b' }} noWrap>
+            <span style={{ display: "block", fontSize: '0.72rem', lineHeight: 1.5, fontWeight: 400, color: '#64748b', overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {dayjs(params.row.posodobljeno_ob).format('DD.MM.YY HH:mm')}
               {params.row.posodobil_ime ? ` · ${params.row.posodobil_ime}` : ''}
-            </Typography>
-          </Stack>
+            </span>
+          </div>
         )}
-      </Stack>
+      </div>
     )
   }
 ];
@@ -336,55 +331,6 @@ function slogBadgaTipaHise(tipHise) {
   };
 }
 
-function renderDenarCelica(params) {
-  return (
-    <Box
-      sx={{
-        width: '100%',
-        height: '100%',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        gap: 0.5
-      }}
-    >
-      <Typography variant="body2" noWrap>
-        {Number(params.value ?? 0).toFixed(2)}
-      </Typography>
-      <EuroSymbolOutlinedIcon fontSize="inherit" />
-    </Box>
-  );
-}
-
-/* Pomožna mini-Badge za porabo (delta) – kvadratasta */
-function PorabaBadge({ vrednost, enota, barva = 'amber' }) {
-  const barve = {
-    amber: { bg: '#fef3c7', border: '#fde68a', text: '#92400e' },
-    blue:  { bg: '#dbeafe', border: '#bfdbfe', text: '#1d4ed8' },
-    emerald: { bg: '#d1fae5', border: '#a7f3d0', text: '#065f46' },
-  };
-  const c = barve[barva] ?? barve.amber;
-  return (
-    <Box
-      sx={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 0.3,
-        px: 0.7,
-        py: 0.1,
-        borderRadius: '4px',
-        background: c.bg,
-        border: `1px solid ${c.border}`,
-        flexShrink: 0,
-      }}
-    >
-      <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: c.text, lineHeight: 1.5 }}>
-        Δ {vrednost} {enota}
-      </Typography>
-    </Box>
-  );
-}
-
 function DatumPlacilaEditCelica(params) {
   const vrednost = params.value ? dayjs(params.value) : null;
 
@@ -419,15 +365,16 @@ const stolpciSobe = [
   {
     field: 'ime_sobe',
     headerName: 'Soba',
-    width: 95,
+    width: 80,
+    flex: 0,
     editable: true,
     renderCell: (params) => (
-      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ height: '100%' }}>
+      <div style={{ display: "flex", flexDirection: "row", gap: 4, alignItems: "center", height: '100%' }}>
         <HomeOutlinedIcon sx={{ fontSize: 13, color: '#94a3b8', flexShrink: 0 }} />
-        <Typography sx={{ fontSize: '0.82rem', fontWeight: 700 }} noWrap>
+        <span style={{ display: "block", fontSize: '0.82rem', lineHeight: 1.5, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {params.value}
-        </Typography>
-      </Stack>
+        </span>
+      </div>
     )
   },
 
@@ -435,28 +382,19 @@ const stolpciSobe = [
   {
     field: 'tip_hise',
     headerName: 'Hiša',
-    width: 95,
+    width: 80,
+    flex: 0,
     editable: true,
     type: 'singleSelect',
     valueOptions: tipiHise,
     renderCell: (params) => {
       const slog = slogBadgaTipaHise(params.value);
       return (
-        <Box
-          sx={{
-            px: 0.75,
-            py: 0.2,
-            borderRadius: '4px',
-            background: slog.ozadje,
-            border: `1px solid ${slog.rob}`,
-            display: 'inline-flex',
-            alignItems: 'center'
-          }}
-        >
-          <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: slog.besedilo, textTransform: 'capitalize' }}>
+        <div style={{ paddingLeft: 6, paddingRight: 6, paddingTop: 1.6, paddingBottom: 1.6, borderRadius: '4px', background: slog.ozadje, border: `1px solid ${slog.rob}`, display: 'inline-flex', alignItems: 'center' }}>
+          <span style={{ display: "block", fontSize: '0.72rem', lineHeight: 1.5, fontWeight: 700, color: slog.besedilo, textTransform: 'capitalize' }}>
             {params.value}
-          </Typography>
-        </Box>
+          </span>
+        </div>
       );
     }
   },
@@ -472,14 +410,14 @@ const stolpciSobe = [
     headerAlign: 'center',
     renderCell: (params) => (
       params.value
-        ? <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.35, px: 0.6, py: 0.15, borderRadius: '4px', background: '#dbeafe', border: '1px solid #bfdbfe' }}>
+        ? <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2.8, paddingLeft: 4.8, paddingRight: 4.8, paddingTop: 1.2, paddingBottom: 1.2, borderRadius: '4px', background: '#dbeafe', border: '1px solid #bfdbfe' }}>
             <WaterDropOutlinedIcon sx={{ fontSize: 11, color: '#3b82f6' }} />
-            <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: '#1d4ed8' }}>da</Typography>
-          </Box>
-        : <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.35, px: 0.6, py: 0.15, borderRadius: '4px', background: '#f1f5f9', border: '1px solid #cbd5e1' }}>
+            <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.5, fontWeight: 700, color: '#1d4ed8' }}>da</span>
+          </div>
+        : <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2.8, paddingLeft: 4.8, paddingRight: 4.8, paddingTop: 1.2, paddingBottom: 1.2, borderRadius: '4px', background: '#f1f5f9', border: '1px solid #cbd5e1' }}>
             <RadioButtonUncheckedIcon sx={{ fontSize: 11, color: '#94a3b8' }} />
-            <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b' }}>ne</Typography>
-          </Box>
+            <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.5, fontWeight: 600, color: '#64748b' }}>ne</span>
+          </div>
     )
   },
 
@@ -496,23 +434,23 @@ const stolpciSobe = [
       const imaStevec = sobaImaVodniStevec(params.row);
       if (imaStevec) {
         return (
-          <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.35, px: 0.6, py: 0.15, borderRadius: '4px', background: '#dbeafe', border: '1px solid #bfdbfe' }}>
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2.8, paddingLeft: 4.8, paddingRight: 4.8, paddingTop: 1.2, paddingBottom: 1.2, borderRadius: '4px', background: '#dbeafe', border: '1px solid #bfdbfe' }}>
               <WaterDropOutlinedIcon sx={{ fontSize: 11, color: '#3b82f6' }} />
-              <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: '#1d4ed8' }}>števec</Typography>
-            </Box>
-          </Box>
+              <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.5, fontWeight: 700, color: '#1d4ed8' }}>števec</span>
+            </div>
+          </div>
         );
       }
       return (
-        <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Stack direction="row" spacing={0.35} alignItems="center">
-            <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#1d4ed8', fontVariantNumeric: 'tabular-nums' }}>
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: "flex", flexDirection: "row", gap: 2.8, alignItems: "center" }}>
+            <span style={{ display: "block", fontSize: '0.8rem', lineHeight: 1.5, fontWeight: 700, color: '#1d4ed8', fontVariantNumeric: 'tabular-nums' }}>
               {Number(params.value ?? 0).toFixed(2)}
-            </Typography>
+            </span>
             <EuroSymbolOutlinedIcon sx={{ fontSize: 12, color: '#3b82f6' }} />
-          </Stack>
-        </Box>
+          </div>
+        </div>
       );
     }
   },
@@ -533,21 +471,21 @@ const stolpciSobe = [
     align: 'center',
     headerAlign: 'center',
     renderCell: (params) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Stack direction="row" spacing={0.55} alignItems="center">
-          <Stack direction="row" spacing={0.4} alignItems="center">
-            <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <div style={{ display: "flex", flexDirection: "row", gap: 4.4, alignItems: "center" }}>
+          <div style={{ display: "flex", flexDirection: "row", gap: 3.2, alignItems: "center" }}>
+            <span style={{ display: "block", fontSize: '0.8rem', lineHeight: 1.5, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
               {Number(params.value ?? 0).toFixed(2)}
-            </Typography>
+            </span>
             <EuroSymbolOutlinedIcon sx={{ fontSize: 12, color: '#d97706' }} />
-          </Stack>
-          <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', background: '#fffbeb', border: '1px solid #fde68a', display: 'inline-flex' }}>
-            <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: '#92400e', fontVariantNumeric: 'tabular-nums' }}>
+          </div>
+          <div style={{ paddingLeft: 4.8, paddingRight: 4.8, paddingTop: 0.8, paddingBottom: 0.8, borderRadius: '4px', background: '#fffbeb', border: '1px solid #fde68a', display: 'inline-flex' }}>
+            <span style={{ display: "block", fontSize: '0.65rem', lineHeight: 1.5, fontWeight: 700, color: '#92400e', fontVariantNumeric: 'tabular-nums' }}>
               delež {Number(params.row.faktor_ogrevanja ?? 0).toFixed(4)}
-            </Typography>
-          </Box>
-        </Stack>
-      </Box>
+            </span>
+          </div>
+        </div>
+      </div>
     )
   },
 
@@ -560,14 +498,14 @@ const stolpciSobe = [
     type: 'boolean',
     renderCell: (params) => (
       params.value
-        ? <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.35, px: 0.6, py: 0.15, borderRadius: '4px', background: '#d1fae5', border: '1px solid #a7f3d0' }}>
+        ? <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2.8, paddingLeft: 4.8, paddingRight: 4.8, paddingTop: 1.2, paddingBottom: 1.2, borderRadius: '4px', background: '#d1fae5', border: '1px solid #a7f3d0' }}>
             <CheckCircleOutlineIcon sx={{ fontSize: 11, color: '#059669' }} />
-            <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: '#065f46' }}>aktivna</Typography>
-          </Box>
-        : <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.35, px: 0.6, py: 0.15, borderRadius: '4px', background: '#f1f5f9', border: '1px solid #cbd5e1' }}>
+            <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.5, fontWeight: 700, color: '#065f46' }}>aktivna</span>
+          </div>
+        : <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2.8, paddingLeft: 4.8, paddingRight: 4.8, paddingTop: 1.2, paddingBottom: 1.2, borderRadius: '4px', background: '#f1f5f9', border: '1px solid #cbd5e1' }}>
             <RadioButtonUncheckedIcon sx={{ fontSize: 11, color: '#94a3b8' }} />
-            <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: '#94a3b8' }}>neaktivna</Typography>
-          </Box>
+            <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.5, fontWeight: 600, color: '#94a3b8' }}>neaktivna</span>
+          </div>
     )
   },
 
@@ -580,17 +518,17 @@ const stolpciSobe = [
     sortable: false,
     filterable: false,
     renderCell: (params) => (
-      <Stack spacing={0.25} py={0.4}>
-        <Typography sx={{ fontSize: '0.78rem', fontWeight: 600 }} noWrap>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingTop: 3.2, paddingBottom: 3.2 }}>
+        <span style={{ display: "block", fontSize: '0.78rem', lineHeight: 1.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {params.row.posodobil_ime ?? '—'}
-        </Typography>
-        <Stack direction="row" spacing={0.5} alignItems="center">
+        </span>
+        <div style={{ display: "flex", flexDirection: "row", gap: 4, alignItems: "center" }}>
           <CalendarTodayOutlinedIcon sx={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }} />
-          <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }} noWrap>
+          <span style={{ display: "block", fontSize: '0.7rem', lineHeight: 1.5, fontWeight: 400, color: '#94a3b8', overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {params.row.posodobljeno_oblikovano ?? '—'}
-          </Typography>
-        </Stack>
-      </Stack>
+          </span>
+        </div>
+      </div>
     )
   }
 ];
@@ -602,11 +540,11 @@ const stolpciCene = [
     headerName: 'Tip hiše',
     width: 120,
     renderCell: (params) => (
-      <Box sx={{ px: 0.75, py: 0.2, borderRadius: '4px', background: '#f0f9ff', border: '1px solid #bae6fd', display: 'inline-flex', alignItems: 'center' }}>
-        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#0369a1', textTransform: 'capitalize' }}>
+      <div style={{ paddingLeft: 6, paddingRight: 6, paddingTop: 1.6, paddingBottom: 1.6, borderRadius: '4px', background: '#f0f9ff', border: '1px solid #bae6fd', display: 'inline-flex', alignItems: 'center' }}>
+        <span style={{ display: "block", fontSize: '0.72rem', lineHeight: 1.5, fontWeight: 700, color: '#0369a1', textTransform: 'capitalize' }}>
           {params.value}
-        </Typography>
-      </Box>
+        </span>
+      </div>
     )
   },
 
@@ -618,14 +556,14 @@ const stolpciCene = [
     align: 'center',
     headerAlign: 'center',
     renderCell: (params) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Stack direction="row" spacing={0.5} alignItems="center">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <div style={{ display: "flex", flexDirection: "row", gap: 4, alignItems: "center" }}>
           <CalendarTodayOutlinedIcon sx={{ fontSize: 12, color: '#94a3b8', flexShrink: 0 }} />
-          <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: '#374151' }}>
+          <span style={{ display: "block", fontSize: '0.78rem', lineHeight: 1.5, fontWeight: 600, color: '#374151' }}>
             {params.value ?? '—'}
-          </Typography>
-        </Stack>
-      </Box>
+          </span>
+        </div>
+      </div>
     )
   },
 
@@ -637,7 +575,9 @@ const stolpciCene = [
     align: 'center',
     headerAlign: 'center',
     renderHeader: () => (
-      <Stack direction="row" spacing={0.5} alignItems="center">
+      <Stack direction="row" spacing={0.5} sx={{
+        alignItems: "center"
+      }}>
         <BoltOutlinedIcon sx={{ fontSize: 14, color: '#f59e0b' }} />
         <Stack spacing={0} sx={{ lineHeight: 1 }}>
           <Typography sx={{ fontSize: '0.78rem', fontWeight: 600 }}>Elektrika</Typography>
@@ -646,15 +586,15 @@ const stolpciCene = [
       </Stack>
     ),
     renderCell: (params) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Stack direction="row" spacing={0.5} alignItems="center">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <div style={{ display: "flex", flexDirection: "row", gap: 4, alignItems: "center" }}>
           <BoltOutlinedIcon sx={{ fontSize: 13, color: '#f59e0b', flexShrink: 0 }} />
-          <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#92400e' }}>
+          <span style={{ display: "block", fontSize: '0.82rem', lineHeight: 1.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#92400e' }}>
             {Number(params.value ?? 0).toFixed(4)}
-          </Typography>
-          <Typography sx={{ fontSize: '0.68rem', color: '#94a3b8' }}>€/kWh</Typography>
-        </Stack>
-      </Box>
+          </span>
+          <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.5, fontWeight: 400, color: '#94a3b8' }}>€/kWh</span>
+        </div>
+      </div>
     )
   },
 
@@ -666,7 +606,9 @@ const stolpciCene = [
     align: 'center',
     headerAlign: 'center',
     renderHeader: () => (
-      <Stack direction="row" spacing={0.5} alignItems="center">
+      <Stack direction="row" spacing={0.5} sx={{
+        alignItems: "center"
+      }}>
         <WaterDropOutlinedIcon sx={{ fontSize: 14, color: '#3b82f6' }} />
         <Stack spacing={0} sx={{ lineHeight: 1 }}>
           <Typography sx={{ fontSize: '0.78rem', fontWeight: 600 }}>Voda</Typography>
@@ -675,15 +617,15 @@ const stolpciCene = [
       </Stack>
     ),
     renderCell: (params) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Stack direction="row" spacing={0.5} alignItems="center">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <div style={{ display: "flex", flexDirection: "row", gap: 4, alignItems: "center" }}>
           <WaterDropOutlinedIcon sx={{ fontSize: 13, color: '#3b82f6', flexShrink: 0 }} />
-          <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#1d4ed8' }}>
+          <span style={{ display: "block", fontSize: '0.82rem', lineHeight: 1.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: '#1d4ed8' }}>
             {Number(params.value ?? 0).toFixed(4)}
-          </Typography>
-          <Typography sx={{ fontSize: '0.68rem', color: '#94a3b8' }}>€/m³</Typography>
-        </Stack>
-      </Box>
+          </span>
+          <span style={{ display: "block", fontSize: '0.68rem', lineHeight: 1.5, fontWeight: 400, color: '#94a3b8' }}>€/m³</span>
+        </div>
+      </div>
     )
   }
 ];
@@ -697,28 +639,19 @@ const stolpciStroski = [
     headerName: 'Soba / Hiša',
     width: 140,
     renderCell: (params) => (
-      <Stack spacing={0.25} py={0.25}>
-        <Stack direction="row" spacing={0.5} alignItems="center">
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingTop: 2, paddingBottom: 2 }}>
+        <div style={{ display: "flex", flexDirection: "row", gap: 4, alignItems: "center" }}>
           <HomeOutlinedIcon sx={{ fontSize: 12, color: 'text.disabled', flexShrink: 0 }} />
-          <Typography variant="caption" fontWeight={700} noWrap>
+          <span style={{ display: "block", fontSize: "0.75rem", lineHeight: 1.66, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {params.row.soba ?? 'Splošno'}
-          </Typography>
-        </Stack>
+          </span>
+        </div>
         {params.row.tip_hise && (
-          <Typography
-            sx={{
-              fontSize: '0.67rem',
-              fontWeight: 600,
-              color: '#64748b',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em'
-            }}
-            noWrap
-          >
+          <span style={{ display: "block", fontSize: '0.67rem', lineHeight: 1.5, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {params.row.tip_hise}
-          </Typography>
+          </span>
         )}
-      </Stack>
+      </div>
     )
   },
 
@@ -730,14 +663,14 @@ const stolpciStroski = [
     align: 'center',
     headerAlign: 'center',
     renderCell: (params) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Stack direction="row" spacing={0.5} alignItems="center">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <div style={{ display: "flex", flexDirection: "row", gap: 4, alignItems: "center" }}>
           <EuroSymbolOutlinedIcon sx={{ fontSize: 13, color: '#059669', flexShrink: 0 }} />
-          <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: '#059669' }}>
+          <span style={{ display: "block", fontSize: '0.85rem', lineHeight: 1.5, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: '#059669' }}>
             {Number(params.value ?? 0).toFixed(2)}
-          </Typography>
-        </Stack>
-      </Box>
+          </span>
+        </div>
+      </div>
     )
   },
 
@@ -756,24 +689,24 @@ const stolpciStroski = [
       return v1 < v2 ? -1 : v1 > v2 ? 1 : 0;
     },
     renderCell: (params) => (
-      <Stack spacing={0.25} alignItems="center" justifyContent="center" sx={{ height: '100%' }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center", justifyContent: "center", height: '100%' }}>
         {params.row.datum_stroska_format ? (
-          <Stack direction="row" spacing={0.5} alignItems="center">
+          <div style={{ display: "flex", flexDirection: "row", gap: 4, alignItems: "center" }}>
             <SellOutlinedIcon sx={{ fontSize: 11, color: '#059669', flexShrink: 0 }} />
-            <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#059669' }}>
+            <span style={{ display: "block", fontSize: '0.72rem', lineHeight: 1.5, fontWeight: 700, color: '#059669' }}>
               {params.row.datum_stroska_format}
-            </Typography>
-          </Stack>
+            </span>
+          </div>
         ) : (
-          <Typography sx={{ fontSize: '0.72rem', color: '#cbd5e1' }}>—</Typography>
+          <span style={{ display: "block", fontSize: '0.72rem', lineHeight: 1.5, fontWeight: 400, color: '#cbd5e1' }}>—</span>
         )}
-        <Stack direction="row" spacing={0.4} alignItems="center">
+        <div style={{ display: "flex", flexDirection: "row", gap: 3.2, alignItems: "center" }}>
           <CalendarTodayOutlinedIcon sx={{ fontSize: 11, color: '#cbd5e1', flexShrink: 0 }} />
-          <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+          <span style={{ display: "block", fontSize: '0.72rem', lineHeight: 1.5, fontWeight: 400, color: '#94a3b8' }}>
             {params.row.ustvarjeno_ob_format ?? ''}
-          </Typography>
-        </Stack>
-      </Stack>
+          </span>
+        </div>
+      </div>
     )
   }
 ];
@@ -784,28 +717,7 @@ const stolpciAdminStevci = [
     field: 'soba',
     headerName: 'Soba / Hiša',
     width: 118,
-    renderCell: (params) => (
-      <Stack spacing={0.25} py={0.25}>
-        <Stack direction="row" spacing={0.5} alignItems="center">
-          <HomeOutlinedIcon sx={{ fontSize: 12, color: 'text.disabled', flexShrink: 0 }} />
-          <Typography variant="caption" fontWeight={700} noWrap>
-            {params.row.soba ?? '-'}
-          </Typography>
-        </Stack>
-        <Typography
-          sx={{
-            fontSize: '0.67rem',
-            fontWeight: 600,
-            color: '#64748b',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-          }}
-          noWrap
-        >
-          {params.row.tip_hise ?? '-'}
-        </Typography>
-      </Stack>
-    )
+    renderCell: renderSobaCelica
   },
 
   // ── Obdobje ───────────────────────────────────────────────────
@@ -814,11 +726,7 @@ const stolpciAdminStevci = [
     headerName: 'Obdobje',
     width: 100,
     sortComparator: (v1, v2) => obdobjeSortKljuc(v1) - obdobjeSortKljuc(v2),
-    renderCell: (params) => (
-      <Box sx={{ px: 0.75, py: 0.2, borderRadius: '4px', background: '#f0fdf4', border: '1px solid #a7f3d0', display: 'inline-flex' }}>
-        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#065f46' }}>{params.value}</Typography>
-      </Box>
-    )
+    renderCell: renderObdobjeCelica
   },
 
   // ── Elektrika: prej → novo ─────────────────────────────────────
@@ -829,18 +737,14 @@ const stolpciAdminStevci = [
     align: 'center',
     headerAlign: 'center',
     renderHeader: () => (
-      <Stack direction="row" spacing={0.4} alignItems="center">
+      <Stack direction="row" spacing={0.4} sx={{
+        alignItems: "center"
+      }}>
         <BoltOutlinedIcon sx={{ fontSize: 13, color: '#f59e0b' }} />
         <Typography sx={{ fontSize: '0.75rem', fontWeight: 600 }}>E prej</Typography>
       </Stack>
     ),
-    renderCell: (params) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Typography sx={{ fontSize: '0.78rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
-          {params.value ?? '—'}
-        </Typography>
-      </Box>
-    )
+    renderCell: renderOdcitekCelica
   },
   {
     field: 'stanje_elektrike',
@@ -849,18 +753,14 @@ const stolpciAdminStevci = [
     align: 'center',
     headerAlign: 'center',
     renderHeader: () => (
-      <Stack direction="row" spacing={0.4} alignItems="center">
+      <Stack direction="row" spacing={0.4} sx={{
+        alignItems: "center"
+      }}>
         <BoltOutlinedIcon sx={{ fontSize: 13, color: '#f59e0b' }} />
         <Typography sx={{ fontSize: '0.75rem', fontWeight: 600 }}>E novo</Typography>
       </Stack>
     ),
-    renderCell: (params) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400e', fontVariantNumeric: 'tabular-nums' }}>
-          {params.value ?? '—'}
-        </Typography>
-      </Box>
-    )
+    renderCell: renderOdcitekCelica
   },
 
   // ── Voda: prej → novo ─────────────────────────────────────────
@@ -871,18 +771,14 @@ const stolpciAdminStevci = [
     align: 'center',
     headerAlign: 'center',
     renderHeader: () => (
-      <Stack direction="row" spacing={0.4} alignItems="center">
+      <Stack direction="row" spacing={0.4} sx={{
+        alignItems: "center"
+      }}>
         <WaterDropOutlinedIcon sx={{ fontSize: 13, color: '#3b82f6' }} />
         <Typography sx={{ fontSize: '0.75rem', fontWeight: 600 }}>V prej</Typography>
       </Stack>
     ),
-    renderCell: (params) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Typography sx={{ fontSize: '0.78rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
-          {params.value ?? '—'}
-        </Typography>
-      </Box>
-    )
+    renderCell: renderOdcitekCelica
   },
   {
     field: 'stanje_vode',
@@ -891,19 +787,14 @@ const stolpciAdminStevci = [
     align: 'center',
     headerAlign: 'center',
     renderHeader: () => (
-      <Stack direction="row" spacing={0.4} alignItems="center">
+      <Stack direction="row" spacing={0.4} sx={{
+        alignItems: "center"
+      }}>
         <WaterDropOutlinedIcon sx={{ fontSize: 13, color: '#3b82f6' }} />
         <Typography sx={{ fontSize: '0.75rem', fontWeight: 600 }}>V novo</Typography>
       </Stack>
     ),
-    renderCell: (params) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        {params.value == null
-          ? <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8' }}>—</Typography>
-          : <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: '#1d4ed8', fontVariantNumeric: 'tabular-nums' }}>{params.value}</Typography>
-        }
-      </Box>
-    )
+    renderCell: renderOdcitekCelica
   },
 
   // ── Kdo in kdaj je vnesel ─────────────────────────────────────
@@ -915,17 +806,17 @@ const stolpciAdminStevci = [
     sortable: false,
     filterable: false,
     renderCell: (params) => (
-      <Stack spacing={0.25} py={0.4}>
-        <Typography sx={{ fontSize: '0.78rem', fontWeight: 600 }} noWrap>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingTop: 3.2, paddingBottom: 3.2 }}>
+        <span style={{ display: "block", fontSize: '0.78rem', lineHeight: 1.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {params.row.vnesel ?? '—'}
-        </Typography>
-        <Stack direction="row" spacing={0.5} alignItems="center">
+        </span>
+        <div style={{ display: "flex", flexDirection: "row", gap: 4, alignItems: "center" }}>
           <CalendarTodayOutlinedIcon sx={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }} />
-          <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }} noWrap>
+          <span style={{ display: "block", fontSize: '0.7rem', lineHeight: 1.5, fontWeight: 400, color: '#94a3b8', overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {params.row.datum_vnosa ?? '—'}
-          </Typography>
-        </Stack>
-      </Stack>
+          </span>
+        </div>
+      </div>
     )
   }
 ];
@@ -937,11 +828,11 @@ const stolpciOgrevanjeTipi = [
     headerName: 'Tip hiše',
     width: 105,
     renderCell: (params) => (
-      <Box sx={{ px: 0.75, py: 0.2, borderRadius: '4px', background: '#f0f9ff', border: '1px solid #bae6fd', display: 'inline-flex' }}>
-        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#0369a1', textTransform: 'capitalize' }}>
+      <div style={{ paddingLeft: 6, paddingRight: 6, paddingTop: 1.6, paddingBottom: 1.6, borderRadius: '4px', background: '#f0f9ff', border: '1px solid #bae6fd', display: 'inline-flex' }}>
+        <span style={{ display: "block", fontSize: '0.72rem', lineHeight: 1.5, fontWeight: 700, color: '#0369a1', textTransform: 'capitalize' }}>
           {params.value}
-        </Typography>
-      </Box>
+        </span>
+      </div>
     )
   },
 
@@ -950,23 +841,7 @@ const stolpciOgrevanjeTipi = [
     field: 'obdobje',
     headerName: 'Obdobje',
     width: 90,
-    renderCell: (params) => (
-      <Box
-        sx={{
-          px: 0.75,
-          py: 0.25,
-          borderRadius: '4px',
-          background: '#f0fdf4',
-          border: '1px solid #a7f3d0',
-          display: 'inline-flex',
-          alignItems: 'center'
-        }}
-      >
-        <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#065f46' }}>
-          {params.value}
-        </Typography>
-      </Box>
-    )
+    renderCell: renderObdobjeCelica
   },
 
   // ── Znesek ogrevanja ──────────────────────────────────────────
@@ -977,20 +852,11 @@ const stolpciOgrevanjeTipi = [
     align: 'center',
     headerAlign: 'center',
     renderCell: (params) => (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <Typography
-          sx={{
-            fontSize: '0.92rem',
-            fontWeight: 800,
-            color: '#d97706',
-            fontVariantNumeric: 'tabular-nums',
-            letterSpacing: '-0.01em',
-          }}
-          noWrap
-        >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <span style={{ display: "block", fontSize: '0.92rem', lineHeight: 1.5, fontWeight: 800, color: '#d97706', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em', overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {Number(params.value ?? 0).toFixed(2)} €
-        </Typography>
-      </Box>
+        </span>
+      </div>
     )
   },
 
@@ -1003,12 +869,12 @@ const stolpciOgrevanjeTipi = [
     renderCell: (params) => (
       params.value
         ? (
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ height: '100%' }}>
+          <div style={{ display: "flex", flexDirection: "row", gap: 4, alignItems: "center", height: '100%' }}>
             <InfoOutlinedIcon sx={{ fontSize: 13, color: '#94a3b8', flexShrink: 0 }} />
-            <Typography sx={{ fontSize: '0.78rem', color: '#374151' }} noWrap>{params.value}</Typography>
-          </Stack>
+            <span style={{ display: "block", fontSize: '0.78rem', lineHeight: 1.5, fontWeight: 400, color: '#374151', overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{params.value}</span>
+          </div>
         )
-        : <Typography sx={{ fontSize: '0.72rem', color: '#cbd5e1' }}>—</Typography>
+        : <span style={{ display: "block", fontSize: '0.72rem', lineHeight: 1.5, fontWeight: 400, color: '#cbd5e1' }}>—</span>
     )
   }
 ];
@@ -1019,22 +885,7 @@ const stolpciObracuni = [
     field: 'obdobje',
     headerName: 'Obdobje',
     width: 90,
-    renderCell: (params) => (
-      <Box
-        sx={{
-          px: 0.75, py: 0.25,
-          borderRadius: '4px',
-          background: '#f0fdf4',
-          border: '1px solid #a7f3d0',
-          display: 'inline-flex',
-          alignItems: 'center',
-        }}
-      >
-        <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#065f46' }}>
-          {params.value}
-        </Typography>
-      </Box>
-    )
+    renderCell: renderObdobjeCelica
   },
 
   // ── Soba / Hiša ─────────────────────────────────────────────────
@@ -1042,28 +893,7 @@ const stolpciObracuni = [
     field: 'soba',
     headerName: 'Soba / Hiša',
     width: 118,
-    renderCell: (params) => (
-      <Stack spacing={0.25} py={0.25}>
-        <Stack direction="row" spacing={0.5} alignItems="center">
-          <HomeOutlinedIcon sx={{ fontSize: 12, color: 'text.disabled', flexShrink: 0 }} />
-          <Typography variant="caption" fontWeight={700} noWrap>
-            {params.row.soba ?? '-'}
-          </Typography>
-        </Stack>
-        <Typography
-          sx={{
-            fontSize: '0.67rem',
-            fontWeight: 600,
-            color: '#64748b',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-          }}
-          noWrap
-        >
-          {params.row.tip_hise ?? '-'}
-        </Typography>
-      </Stack>
-    )
+    renderCell: renderSobaCelica
   },
 
   // ── Najemnik ─────────────────────────────────────────────────────
@@ -1119,23 +949,7 @@ const stolpciObracuni = [
     editable: true,
     sortable: false,
     type: 'number',
-    renderCell: (params) => (
-      <Stack spacing={0.3} sx={{ width: '100%', py: 0.5 }}>
-        {/* Prev → New reading row */}
-        <Stack direction="row" spacing={0.4} alignItems="center">
-          <BoltOutlinedIcon sx={{ fontSize: 12, color: '#f59e0b', flexShrink: 0 }} />
-          <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
-            {Number(params.row.stanje_elektrike_prej ?? 0)}
-          </Typography>
-          <Typography sx={{ fontSize: '0.65rem', color: '#cbd5e1', mx: 0.2 }}>→</Typography>
-          <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-            {Number(params.value ?? 0)}
-          </Typography>
-        </Stack>
-        {/* Consumption delta badge */}
-        <PorabaBadge vrednost={Number(params.row.poraba_elektrike ?? 0)} enota="kWh" barva="amber" />
-      </Stack>
-    )
+    renderCell: renderElektrikaCelica
   },
 
   // ── Odčitek vode: prej → novo + delta badge ─────────────────────
@@ -1146,31 +960,7 @@ const stolpciObracuni = [
     editable: true,
     sortable: false,
     type: 'number',
-    renderCell: (params) => {
-      const niVode = params.value == null;
-      return (
-        <Stack spacing={0.3} sx={{ width: '100%', py: 0.5 }}>
-          <Stack direction="row" spacing={0.4} alignItems="center">
-            <WaterDropOutlinedIcon sx={{ fontSize: 12, color: '#3b82f6', flexShrink: 0 }} />
-            <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
-              {Number(params.row.stanje_vode_prej ?? 0)}
-            </Typography>
-            <Typography sx={{ fontSize: '0.65rem', color: '#cbd5e1', mx: 0.2 }}>→</Typography>
-            <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-              {niVode ? '—' : Number(params.value)}
-            </Typography>
-          </Stack>
-          {niVode
-            ? (
-              <Box sx={{ px: 0.7, py: 0.1, borderRadius: '4px', background: '#f1f5f9', border: '1px solid #e2e8f0', display: 'inline-flex' }}>
-                <Typography sx={{ fontSize: '0.68rem', color: '#94a3b8' }}>ni števca</Typography>
-              </Box>
-            )
-            : <PorabaBadge vrednost={Number(params.row.poraba_vode ?? 0)} enota="m³" barva="blue" />
-          }
-        </Stack>
-      );
-    }
+    renderCell: renderVodaCelica
   },
 
   // ── Strošek E + V: ikone + poudarjen skupaj ───────────────────────
@@ -1180,44 +970,7 @@ const stolpciObracuni = [
     width: 112,
     sortable: false,
     filterable: false,
-    renderCell: (params) => {
-      const e = Number(params.row.strosek_elektrike ?? 0);
-      const v = Number(params.row.strosek_vode ?? 0);
-      const skupaj = e + v;
-      return (
-        <Stack spacing={0.2} sx={{ width: '100%', py: 0.4 }}>
-          {/* Elektrika */}
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            <BoltOutlinedIcon sx={{ fontSize: 12, color: '#f59e0b', flexShrink: 0 }} />
-            <Typography sx={{ fontSize: '0.7rem', color: '#64748b', flex: 1 }}>E</Typography>
-            <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-              {e.toFixed(2)} €
-            </Typography>
-          </Stack>
-          {/* Voda */}
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            <WaterDropOutlinedIcon sx={{ fontSize: 12, color: '#3b82f6', flexShrink: 0 }} />
-            <Typography sx={{ fontSize: '0.7rem', color: '#64748b', flex: 1 }}>V</Typography>
-            <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-              {v.toFixed(2)} €
-            </Typography>
-          </Stack>
-          {/* Skupaj – bold divider line */}
-          <Box sx={{ height: '1px', bgcolor: 'rgba(15,23,42,0.08)', mx: 0.25 }} />
-          <Typography
-            sx={{
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              textAlign: 'right',
-              color: '#0f172a',
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {skupaj.toFixed(2)} €
-          </Typography>
-        </Stack>
-      );
-    }
+    renderCell: renderStrosekEnergijeCelica
   },
 
   // ── Skupaj – poudarjen emerald znesek ─────────────────────────────
@@ -1226,30 +979,7 @@ const stolpciObracuni = [
     headerName: 'Skupaj',
     width: 92,
     type: 'number',
-    renderCell: (params) => (
-      <Box
-        sx={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-        }}
-      >
-        <Typography
-          sx={{
-            fontSize: '0.92rem',
-            fontWeight: 800,
-            color: '#059669',
-            fontVariantNumeric: 'tabular-nums',
-            letterSpacing: '-0.01em',
-          }}
-          noWrap
-        >
-          {Number(params.value ?? 0).toFixed(2)} €
-        </Typography>
-      </Box>
-    )
+    renderCell: renderSkupajCelica
   },
 
   // ── Status potrditve – Chip badge (urejljivo boolean) ──────────────
@@ -1259,20 +989,7 @@ const stolpciObracuni = [
     width: 96,
     editable: true,
     type: 'boolean',
-    renderCell: (params) => (
-      params.value
-        ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 0.75, py: 0.3, borderRadius: '4px', background: '#d1fae5', border: '1px solid #a7f3d0' }}>
-            <CheckCircleOutlineIcon sx={{ fontSize: 13, color: '#059669' }} />
-            <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#065f46' }}>Potrjeno</Typography>
-          </Box>
-        ) : (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 0.75, py: 0.3, borderRadius: '4px', background: '#fef3c7', border: '1px solid #fde68a' }}>
-            <RadioButtonUncheckedIcon sx={{ fontSize: 13, color: '#d97706' }} />
-            <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#92400e' }}>Odprto</Typography>
-          </Box>
-        )
-    )
+    renderCell: renderStatusCelica
   },
 
   // ── Datumi vnosa in plačila (sortirano po datumu obračuna) ───────────
@@ -1289,34 +1006,7 @@ const stolpciObracuni = [
       return dayjs(a ?? 0).valueOf() - dayjs(b ?? 0).valueOf();
     },
     renderEditCell: (params) => <DatumPlacilaEditCelica {...params} />,
-    renderCell: (params) => (
-      <Stack spacing={0.3} py={0.4} sx={{ lineHeight: 1.2 }}>
-        {/* Datum vnosa */}
-        <Stack direction="row" spacing={0.5} alignItems="center">
-          <CalendarTodayOutlinedIcon sx={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }} />
-          <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }} noWrap>
-            {params.row.datum_vnosa_format ?? '—'}
-          </Typography>
-        </Stack>
-        {/* Datum plačila – zeleno če je, amber pika če ni */}
-        <Stack direction="row" spacing={0.5} alignItems="center">
-          {params.row.datum_placila_format
-            ? <CheckCircleOutlineIcon sx={{ fontSize: 11, color: '#059669', flexShrink: 0 }} />
-            : <RadioButtonUncheckedIcon sx={{ fontSize: 11, color: '#d97706', flexShrink: 0 }} />
-          }
-          <Typography
-            sx={{
-              fontSize: '0.72rem',
-              fontWeight: 600,
-              color: params.row.datum_placila_format ? '#059669' : '#d97706',
-            }}
-            noWrap
-          >
-            {params.row.datum_placila_format ?? 'ni potrjeno'}
-          </Typography>
-        </Stack>
-      </Stack>
-    )
+    renderCell: renderDatumiCelica
   }
 ];
 
@@ -1371,7 +1061,7 @@ const lokalizacijaMreze = {
   filterPanelOperator: 'Operator',
   filterPanelOperatorAnd: 'In',
   filterPanelOperatorOr: 'Ali',
-  filterPanelColumns: 'Stolpec',
+  filterPanelColumn: 'Stolpec',
   filterPanelInputLabel: 'Vrednost',
   filterPanelInputPlaceholder: 'Vrednost filtra',
   filterOperatorContains: 'vsebuje',

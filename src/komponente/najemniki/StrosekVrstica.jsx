@@ -7,20 +7,25 @@ export default function StrosekVrstica({ label, vrednost, ikona }) {
   return (
     <Stack
       direction="row"
-      justifyContent="space-between"
-      alignItems="center"
       sx={{
+        justifyContent: "space-between",
+        alignItems: "center",
         py: 0.6,
         px: 0.75,
         borderRadius: '4px',
         '&:hover': { background: '#f8fafc' }
-      }}
-    >
-      <Stack direction="row" alignItems="center" spacing={0.75}>
+      }}>
+      <Stack direction="row" spacing={0.75} sx={{
+        alignItems: "center"
+      }}>
         {ikona && <Box sx={{ display: 'flex', flexShrink: 0 }}>{ikona}</Box>}
-        <Typography variant="body2" color="text.secondary">{label}</Typography>
+        <Typography variant="body2" sx={{
+          color: "text.secondary"
+        }}>{label}</Typography>
       </Stack>
-      <Typography variant="body2" fontWeight={600}>{vrednost}</Typography>
+      <Typography variant="body2" sx={{
+        fontWeight: 600
+      }}>{vrednost}</Typography>
     </Stack>
   );
 }

@@ -32,8 +32,15 @@ export default function DialogPodrobnostiObracuna({
       maxWidth="xs"
     >
       <DialogTitle sx={{ pb: 1 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography variant="h6" fontWeight={700}>Razčlenitev</Typography>
+        <Stack
+          direction="row"
+          sx={{
+            alignItems: "center",
+            justifyContent: "space-between"
+          }}>
+          <Typography variant="h6" sx={{
+            fontWeight: 700
+          }}>Razčlenitev</Typography>
           {izbranRacun && (
             <Box
               sx={{
@@ -73,19 +80,36 @@ export default function DialogPodrobnostiObracuna({
             />
             <Divider />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, px: 1, borderRadius: '6px', background: '#f8fafc' }}>
-              <Typography fontWeight={700}>SKUPAJ</Typography>
-              <Typography variant="h6" fontWeight={800} color="primary.main">
+              <Typography sx={{
+                fontWeight: 700
+              }}>SKUPAJ</Typography>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 800,
+                  color: "primary.main"
+                }}>
                 {skupniZnesekRacuna(izbranRacun)}
               </Typography>
             </Box>
             <Stack spacing={0.5} sx={{ pt: 0.5 }}>
-              <Stack direction="row" justifyContent="space-between">
-                <Typography variant="caption" color="text.secondary">Izračun</Typography>
+              <Stack direction="row" sx={{
+                justifyContent: "space-between"
+              }}>
+                <Typography variant="caption" sx={{
+                  color: "text.secondary"
+                }}>Izračun</Typography>
                 <Typography variant="caption">{izbranRacun.datum_izracuna}</Typography>
               </Stack>
-              <Stack direction="row" justifyContent="space-between">
-                <Typography variant="caption" color="text.secondary">Potrjeno</Typography>
-                <Typography variant="caption" fontWeight={600}>
+              <Stack direction="row" sx={{
+                justifyContent: "space-between"
+              }}>
+                <Typography variant="caption" sx={{
+                  color: "text.secondary"
+                }}>Potrjeno</Typography>
+                <Typography variant="caption" sx={{
+                  fontWeight: 600
+                }}>
                   {izbranRacun.placano_bool ? `Potrjeno (${izbranRacun.datum_placila})` : 'Ni potrjeno'}
                 </Typography>
               </Stack>

@@ -6,9 +6,9 @@
  *  - Prebrana so prikazana z nižjo opaciteto
  *  - Enostavno brskanje z vertikalnim seznamom kartic
  */
+import { useObvestila } from '../../kontekst/ObvestilaKontekst';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
   Box,
   Chip,
   CircularProgress,
@@ -23,18 +23,17 @@ import dayjs from 'dayjs';
 import { pridobiVsaAktivnaObvestila } from '../../storitve/podatki';
 
 export default function ObvestilaSekcijaNajemnik() {
+  const { napaka: prikaziNapako } = useObvestila();
   const [obvestila, setObvestila] = useState([]);
   const [nalaganje, setNalaganje] = useState(true);
-  const [napaka, setNapaka] = useState('');
 
   const nalozi = useCallback(async () => {
     setNalaganje(true);
-    setNapaka('');
     try {
       const data = await pridobiVsaAktivnaObvestila();
       setObvestila(data);
     } catch (err) {
-      setNapaka(err.message || 'Napaka pri nalaganju obvestil.');
+      prikaziNapako(err.message || 'Napaka pri nalaganju obvestil.');
     } finally {
       setNalaganje(false);
     }
@@ -48,27 +47,34 @@ export default function ObvestilaSekcijaNajemnik() {
     <Stack spacing={2.5}>
       {/* Glava */}
       <Box>
-        <Stack direction="row" alignItems="center" spacing={1.5}>
+        <Stack direction="row" spacing={1.5} sx={{
+          alignItems: "center"
+        }}>
           <CampaignOutlinedIcon sx={{ fontSize: 26, color: 'text.secondary' }} />
           <Box>
-            <Typography variant="h5" fontWeight={700}>
+            <Typography variant="h5" sx={{
+              fontWeight: 700
+            }}>
               Obvestila
             </Typography>
-            <Typography variant="body2" color="text.secondary" mt={0.25}>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "text.secondary",
+                mt: 0.25
+              }}>
               Sporočila najemodajalca za vašo sobo.
             </Typography>
           </Box>
         </Stack>
       </Box>
 
-      {napaka && (
-        <Alert severity="error" onClose={() => setNapaka('')}>
-          {napaka}
-        </Alert>
-      )}
-
       {nalaganje ? (
-        <Stack alignItems="center" py={6}>
+        <Stack
+          sx={{
+            alignItems: "center",
+            py: 6
+          }}>
           <CircularProgress size={28} />
         </Stack>
       ) : obvestila.length === 0 ? (
@@ -82,7 +88,9 @@ export default function ObvestilaSekcijaNajemnik() {
           }}
         >
           <CampaignOutlinedIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
-          <Typography color="text.secondary" variant="body2">
+          <Typography variant="body2" sx={{
+            color: "text.secondary"
+          }}>
             Ni aktivnih obvestil.
           </Typography>
         </Box>
@@ -114,8 +122,16 @@ function ObvestiloKartica({ obvestilo, stevilka, skupaj }) {
       }}
     >
       {/* Glava kartice */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
-        <Stack direction="row" spacing={1} alignItems="center">
+      <Stack
+        direction="row"
+        sx={{
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 1.5
+        }}>
+        <Stack direction="row" spacing={1} sx={{
+          alignItems: "center"
+        }}>
           {neprebrano ? (
             <MarkEmailUnreadOutlinedIcon
               sx={{ fontSize: 18, color: 'primary.main' }}
@@ -133,11 +149,17 @@ function ObvestiloKartica({ obvestilo, stevilka, skupaj }) {
             sx={{ fontSize: '0.68rem', height: 20, fontWeight: 600 }}
           />
         </Stack>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Typography variant="caption" color="text.disabled">
+        <Stack direction="row" spacing={1} sx={{
+          alignItems: "center"
+        }}>
+          <Typography variant="caption" sx={{
+            color: "text.disabled"
+          }}>
             {stevilka}/{skupaj}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" sx={{
+            color: "text.secondary"
+          }}>
             {datum}
           </Typography>
         </Stack>
