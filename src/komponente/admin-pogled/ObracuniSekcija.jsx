@@ -347,6 +347,7 @@ export default function ObracuniSekcija({
               placila={podatkiPlacila}
               imenaMesecov={imenaMesecov}
               letaObracunov={letaObracunov}
+              lokalizacijaMreze={lokalizacijaMreze}
               osvezi={osveziPodatke}
               odpriObracune={(vrstica, obdobje) => {
                 setFilterObracuni({ soba_id: vrstica.soba_id, uporabnik_id: vrstica.uporabnik_id, ...obdobje });

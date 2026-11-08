@@ -1,0 +1,5 @@
+.oddaja-mesec { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 5px; background: #fff; font: inherit; }
+.oddaja-mesec-oddano { background: #059669; border-color: #059669; color: #fff; font-size: 1rem; font-weight: 700; cursor: pointer; }
+.oddaja-mesec-oddano:hover { background: #047857; border-color: #047857; }
+.oddaja-mesec-oddano:focus-visible { outline: 2px solid #065f46; outline-offset: 2px; }
+.oddaja-mesec-nepotrebno { border-color: transparent; background: #f1f5f9; color: #94a3b8; }

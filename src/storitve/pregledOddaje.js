@@ -76,3 +76,34 @@ export function pripraviPregledOddajeZaMesece({ meseci, leto, ...podatki }) {
       || b.mesec - a.mesec;
   });
 }
+
+// The annual matrix follows current assignments; historical tenants remain in the list view.
+export function pripraviLetniPregledOddaj({ sobe, uporabniki, placila, leto, trenutno }) {
+  const aktivneSobe = sobe.filter((s) => s.aktivna !== false);
+  const sobeIds = new Set(aktivneSobe.map((s) => s.id));
+  const aktivniKljuci = new Set(uporabniki
+    .filter((u) => u.aktiven && !u.admin && sobeIds.has(u.soba_id))
+    .map((u) => `${u.soba_id}|${u.id}`));
+  const poNajemniku = new Map();
+  const meseci = Array.from({ length: 12 }, (_, i) => i + 1);
+  for (const v of pripraviPregledOddajeZaMesece({ sobe: aktivneSobe, uporabniki, placila, meseci, leto })) {
+    const kljuc = `${v.soba_id}|${v.uporabnik_id}`;
+    if (!aktivniKljuci.has(kljuc)) continue;
+    if (!poNajemniku.has(kljuc)) {
+      poNajemniku.set(kljuc, {
+        id: kljuc, soba_id: v.soba_id, uporabnik_id: v.uporabnik_id,
+        soba: v.soba, najemnik: v.najemnik, tip_hise: v.tip_hise, meseci: {}
+      });
+    }
+    const prihodnji = Number(leto) * 12 + v.mesec > trenutno.leto * 12 + trenutno.mesec;
+    poNajemniku.get(kljuc).meseci[v.mesec] = prihodnji && v.status !== 'oddano'
+      ? { ...v, status: 'ni_potrebno', razlog: 'Prihodnji mesec' }
+      : v;
+  }
+  return [...poNajemniku.values()].map((v) => {
+    const oddaje = Object.values(v.meseci);
+    const manjka = oddaje.filter((m) => m.status === 'manjka').length;
+    const oddano = oddaje.filter((m) => m.status === 'oddano').length;
+    return { ...v, manjka, oddano, status: manjka ? 'manjka' : oddano ? 'oddano' : 'ni_potrebno' };
+  }).sort((a, b) => String(a.soba).localeCompare(String(b.soba), 'sl', { numeric: true }) || a.najemnik.localeCompare(b.najemnik, 'sl'));
+}

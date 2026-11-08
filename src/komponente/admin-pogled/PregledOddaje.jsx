@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Box, Button, Checkbox, Chip, IconButton, InputAdornment,
-  MenuItem, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead,
-  TablePagination, TableRow, TextField, Tooltip, Typography
+  MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
 import PendingActionsOutlinedIcon from '@mui/icons-material/PendingActionsOutlined';
@@ -13,7 +12,10 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import FilterAltOffOutlinedIcon from '@mui/icons-material/FilterAltOffOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import { pripraviPregledOddajeZaMesece } from '../../storitve/pregledOddaje';
+import { pripraviLetniPregledOddaj, pripraviPregledOddajeZaMesece } from '../../storitve/pregledOddaje';
+import DataGrid from './AdminDataGrid';
+import './pregledOddaje.css';
+import { ADMIN_DATAGRID_FLEKS_SX, ADMIN_TABELA_FLEKS_SX } from './adminSekcijaPostavitev';
 
 const STATUSI = {
   manjka: { naziv: 'Ni oddano', barva: 'warning', Ikona: PendingActionsOutlinedIcon },
@@ -39,8 +41,19 @@ function trenutnoObdobje() {
   return { mesec: Number(deli.find((d) => d.type === 'month').value), leto: Number(deli.find((d) => d.type === 'year').value) };
 }
 
-export default function PregledOddaje({ sobe, uporabniki, placila, imenaMesecov, letaObracunov, osvezi, odpriObracune }) {
+function BrezOddaj({ onPocisti }) {
+  return <Stack sx={{ height: '100%', alignItems: 'center', justifyContent: 'center', px: 2, textAlign: 'center' }}>
+    <Typography variant="body2" color="text.secondary">Ni zadetkov. Poskusi drug status, hišo ali iskalni niz.</Typography>
+    <Button size="small" onClick={onPocisti} sx={{ mt: 0.5 }}>Počisti filtre</Button>
+  </Stack>;
+}
+
+const PREGLED_OVERLAY_SLOTS = { noRowsOverlay: BrezOddaj };
+
+export default function PregledOddaje({ sobe, uporabniki, placila, imenaMesecov, letaObracunov, lokalizacijaMreze, osvezi, odpriObracune }) {
   const trenutno = trenutnoObdobje();
+  const [pogled, setPogled] = useState('letni');
+  const letniPogled = pogled === 'letni';
   const [obdobje, setObdobje] = useState(() => ({ leto: trenutno.leto, meseci: [trenutno.mesec] }));
   const [sobaId, setSobaId] = useState('');
   const [iskanje, setIskanje] = useState('');
@@ -49,7 +62,10 @@ export default function PregledOddaje({ sobe, uporabniki, placila, imenaMesecov,
   const [stran, setStran] = useState(0);
   const [steviloVrstic, setSteviloVrstic] = useState(50);
   const [osvezujem, setOsvezujem] = useState(false);
-  const vrstice = useMemo(() => pripraviPregledOddajeZaMesece({ sobe, uporabniki, placila, ...obdobje }), [sobe, uporabniki, placila, obdobje]);
+  const seznamVrstice = useMemo(() => pripraviPregledOddajeZaMesece({ sobe, uporabniki, placila, ...obdobje }), [sobe, uporabniki, placila, obdobje]);
+  const letneVrstice = useMemo(() => pripraviLetniPregledOddaj({ sobe, uporabniki, placila, leto: obdobje.leto, trenutno }),
+    [sobe, uporabniki, placila, obdobje.leto, trenutno.mesec, trenutno.leto]);
+  const vrstice = letniPogled ? letneVrstice : seznamVrstice;
   const hisneVrstice = vrstice.filter((v) => (!hisa || v.tip_hise === hisa) && (!sobaId || v.soba_id === sobaId));
   const stevila = Object.fromEntries(['manjka', 'oddano', 'ni_potrebno'].map((s) => [s, hisneVrstice.filter((v) => v.status === s).length]));
   const niz = iskanje.trim().toLocaleLowerCase('sl');
@@ -62,6 +78,73 @@ export default function PregledOddaje({ sobe, uporabniki, placila, imenaMesecov,
   const jeTrenutno = enMesec && obdobje.meseci[0] === trenutno.mesec && obdobje.leto === trenutno.leto;
   const zadnjiMesec = obdobje.leto === trenutno.leto ? trenutno.mesec : 12;
   const spremeniFilter = (nastavi, vrednost) => { nastavi(vrednost); setStran(0); };
+  const stolpci = useMemo(() => [
+    { field: 'soba', headerName: 'Soba', width: 80, flex: 0,
+      renderCell: ({ value }) => <strong>{value}</strong> },
+    { field: 'najemnik', headerName: 'Najemnik', width: 200 },
+    { field: 'tip_hise', headerName: 'Hiša', width: 125,
+      renderCell: ({ value }) => <span style={{ textTransform: 'capitalize' }}>{value ? `${value} hiša` : '—'}</span> },
+    { field: 'obdobje', headerName: 'Obdobje', width: 160, type: 'number', align: 'left', headerAlign: 'left',
+      valueGetter: (_, row) => Number(row.leto) * 12 + Number(row.mesec),
+      renderCell: ({ row }) => `${imenaMesecov[row.mesec - 1]} ${row.leto}` },
+    { field: 'status', headerName: 'Status oddaje', width: 300,
+      valueFormatter: (value) => STATUSI[value]?.naziv ?? value,
+      renderCell: ({ row }) => {
+        const { naziv, barva, Ikona } = STATUSI[row.status];
+        return <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+          <Tooltip title={row.status === 'oddano' ? opisOddaje(row.datum_oddaje) : ''} describeChild arrow>
+            <Chip size="small" variant="outlined" icon={<Ikona />} label={naziv} color={barva} tabIndex={row.status === 'oddano' ? 0 : undefined} sx={{ flexShrink: 0 }} />
+          </Tooltip>
+          {row.status === 'ni_potrebno' && <Tooltip title={row.razlog} describeChild>
+            <Typography component="span" variant="caption" noWrap sx={{ color: 'text.secondary', minWidth: 0 }}>{row.razlog}</Typography>
+          </Tooltip>}
+        </Box>;
+      } },
+    { field: 'placano', headerName: 'Status obračuna', width: 155, align: 'center', headerAlign: 'center',
+      renderCell: ({ value }) => value == null ? '—' : <Chip size="small" variant="outlined" label={value ? 'Potrjeno' : 'Odprto'} color={value ? 'success' : 'warning'} /> },
+    { field: 'akcije_pregled_oddaj', headerName: 'Obračun', width: 95, flex: 0,
+      sortable: false, filterable: false, disableColumnMenu: true, align: 'center', headerAlign: 'center',
+      renderCell: ({ row }) => row.status === 'oddano' ? <Tooltip title="Poglej obračun">
+        <IconButton size="small" color="primary" aria-label={`Poglej obračun za sobo ${row.soba}`} onClick={(e) => {
+          e.stopPropagation();
+          odpriObracune(row, { mesec: row.mesec, leto: row.leto });
+        }}><VisibilityOutlinedIcon sx={{ fontSize: 18 }} /></IconButton>
+      </Tooltip> : '—' }
+  ], [imenaMesecov, odpriObracune]);
+
+  const letniStolpci = useMemo(() => [
+    { field: 'soba', headerName: 'Soba', width: 80, flex: 0,
+      renderCell: ({ value }) => <strong>{value}</strong> },
+    { field: 'najemnik', headerName: 'Najemnik', width: 140, flex: 0 },
+    ...Array.from({ length: 12 }, (_, i) => {
+      const mesec = i + 1;
+      const kratica = imenaMesecov[i].slice(0, 3);
+      return {
+        field: `mesec_${mesec}`, headerName: kratica, width: 56,
+        align: 'center', headerAlign: 'center', sortable: false, filterable: false, disableColumnMenu: true,
+        renderHeader: () => <Tooltip title={imenaMesecov[i]}><span>{kratica}</span></Tooltip>,
+        renderCell: ({ row }) => {
+          const oddaja = row.meseci[mesec];
+          const naziv = `${row.soba}, ${row.najemnik}, ${imenaMesecov[i]} ${obdobje.leto}`;
+          if (oddaja.status === 'oddano') {
+            return <button type="button" className="oddaja-mesec oddaja-mesec-oddano"
+              aria-label={`Poglej obračun: ${naziv}`}
+              title={`${naziv} — Oddano; ${oddaja.placano ? 'Potrjeno' : 'Odprto'}. ${opisOddaje(oddaja.datum_oddaje)}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                odpriObracune(oddaja, { mesec, leto: obdobje.leto });
+              }}><span aria-hidden="true">✓</span></button>;
+          }
+          const niPotrebno = oddaja.status === 'ni_potrebno';
+          const opis = `${naziv} — ${niPotrebno ? oddaja.razlog : 'Ni oddano'}`;
+          return <span className={`oddaja-mesec${niPotrebno ? ' oddaja-mesec-nepotrebno' : ''}`} title={opis} aria-label={opis}>
+            {niPotrebno ? <span aria-hidden="true">—</span> : null}
+          </span>;
+        }
+      };
+    })
+  ], [imenaMesecov, obdobje.leto, odpriObracune]);
+
   function premakniMesec(premik) {
     if (!enMesec) return;
     const datum = new Date(obdobje.leto, obdobje.meseci[0] - 1 + premik, 1);
@@ -75,6 +158,16 @@ export default function PregledOddaje({ sobe, uporabniki, placila, imenaMesecov,
       '& .MuiInputLabel-root': { fontSize: '0.8rem' },
       '& .MuiButton-sizeSmall': { py: 0.5, px: 1, minHeight: 30 }
     }}>
+      <Stack direction="row" sx={{ alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+        <ToggleButtonGroup value={pogled} exclusive size="small" color="primary" aria-label="Prikaz oddaj"
+          onChange={(_, novPogled) => { if (novPogled) { setPogled(novPogled); setStran(0); } }}>
+          <ToggleButton value="letni" sx={{ textTransform: 'none' }}>Letni pregled</ToggleButton>
+          <ToggleButton value="seznam" sx={{ textTransform: 'none' }}>Seznam</ToggleButton>
+        </ToggleButtonGroup>
+        {letniPogled && <Tooltip title="Prikazani so trenutno aktivni najemniki v aktivnih sobah. Kljukica pomeni shranjeno oddajo; potrditev obračuna je navedena ob njej. Prejšnji najemniki so v pogledu Seznam.">
+          <Typography variant="caption" color="text.secondary">✓ Oddano · □ Ni oddano · — Ni potrebno / prihodnji mesec</Typography>
+        </Tooltip>}
+      </Stack>
       <Stack
         direction="row"
         sx={{
@@ -92,7 +185,7 @@ export default function PregledOddaje({ sobe, uporabniki, placila, imenaMesecov,
             flexWrap: "wrap",
             mr: 'auto'
           }}>
-          {[{ key: 'vsi', label: 'Vsi', count: hisneVrstice.length }, ...Object.entries(STATUSI).map(([key, s]) => ({ key, label: s.naziv, count: stevila[key] }))].map(({ key, label, count }) => (
+          {[{ key: 'vsi', label: 'Vsi', count: hisneVrstice.length }, ...Object.entries(STATUSI).map(([key, s]) => ({ key, label: letniPogled && key === 'manjka' ? 'Manjkajo oddaje' : letniPogled && key === 'oddano' ? 'Vse oddano' : s.naziv, count: stevila[key] }))].map(({ key, label, count }) => (
             <Button key={key} size="small" variant={status === key ? 'contained' : 'text'} aria-pressed={status === key} onClick={() => spremeniFilter(setStatus, key)}>{label} ({count})</Button>
           ))}
         </Stack>
@@ -102,10 +195,10 @@ export default function PregledOddaje({ sobe, uporabniki, placila, imenaMesecov,
             gap: 0.25,
             alignItems: "center"
           }}>
-          <Tooltip title={enMesec ? 'Prejšnji mesec' : 'Za premik izberi en mesec'}>
+          {!letniPogled && <Tooltip title={enMesec ? 'Prejšnji mesec' : 'Za premik izberi en mesec'}>
             <span><IconButton size="small" aria-label="Prejšnji mesec" onClick={() => premakniMesec(-1)} disabled={!enMesec || (obdobje.leto <= Math.min(...leta) && obdobje.meseci[0] === 1)}><ChevronLeftIcon fontSize="small" /></IconButton></span>
-          </Tooltip>
-          <TextField
+          </Tooltip>}
+          {!letniPogled && <TextField
             select size="small" label="Meseci" value={obdobje.meseci} sx={{ width: { xs: 135, sm: 155 } }}
             onChange={(e) => {
               const vrednost = typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value;
@@ -126,7 +219,7 @@ export default function PregledOddaje({ sobe, uporabniki, placila, imenaMesecov,
                 <Checkbox size="small" checked={obdobje.meseci.includes(i + 1)} disableRipple sx={{ p: 0.5, mr: 0.5 }} />{ime}
               </MenuItem>
             ))}
-          </TextField>
+          </TextField>}
           <TextField select size="small" label="Leto" value={obdobje.leto} sx={{ width: 82 }} onChange={(e) => {
             const leto = Number(e.target.value);
             const meseci = obdobje.meseci.filter((m) => leto < trenutno.leto || m <= trenutno.mesec);
@@ -134,11 +227,11 @@ export default function PregledOddaje({ sobe, uporabniki, placila, imenaMesecov,
           }}>
             {leta.filter((leto) => leto <= trenutno.leto).map((leto) => <MenuItem key={leto} value={leto}>{leto}</MenuItem>)}
           </TextField>
-          <Tooltip title={enMesec ? 'Naslednji mesec' : 'Za premik izberi en mesec'}>
+          {!letniPogled && <Tooltip title={enMesec ? 'Naslednji mesec' : 'Za premik izberi en mesec'}>
             <span><IconButton size="small" aria-label="Naslednji mesec" disabled={!enMesec || jeTrenutno} onClick={() => premakniMesec(1)}><ChevronRightIcon fontSize="small" /></IconButton></span>
-          </Tooltip>
+          </Tooltip>}
         </Stack>
-        {!jeTrenutno && <Button size="small" onClick={() => spremeniFilter(setObdobje, { leto: trenutno.leto, meseci: [trenutno.mesec] })}>Tekoči mesec</Button>}
+        {!letniPogled && !jeTrenutno && <Button size="small" onClick={() => spremeniFilter(setObdobje, { leto: trenutno.leto, meseci: [trenutno.mesec] })}>Tekoči mesec</Button>}
         <TextField select size="small" label="Soba" value={sobaId} sx={{ width: 125 }} onChange={(e) => spremeniFilter(setSobaId, e.target.value)}>
           <MenuItem value="">Vse sobe</MenuItem>
           {sobe.map((soba) => <MenuItem key={soba.id} value={soba.id}>{soba.ime_sobe}</MenuItem>)}
@@ -176,58 +269,29 @@ export default function PregledOddaje({ sobe, uporabniki, placila, imenaMesecov,
         </Tooltip>
       </Stack>
 
-      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        <Paper variant="outlined" sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <TableContainer sx={{ flex: 1, minHeight: 0, overflow: 'auto', scrollbarGutter: 'stable' }}>
-          <Table stickyHeader size="small" aria-label={`Oddaja obračunov za ${nazivObdobja}`} sx={{
-            tableLayout: 'fixed', width: '100%', minWidth: 1120,
-            '& .MuiTableCell-root': { py: 0.5, px: 1.5, height: 36, fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-            '& .MuiTableHead-root': { bgcolor: 'action.hover' },
-            '& .MuiChip-root': { height: 22 },
-            '& .MuiButton-root': { minHeight: 24, py: 0 }
-          }}>
-            <colgroup>
-              <col style={{ width: 80 }} />
-              <col style={{ width: '22%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '14%' }} />
-              <col />
-              <col style={{ width: 140 }} />
-              <col style={{ width: 90 }} />
-            </colgroup>
-            <TableHead><TableRow><TableCell>Soba</TableCell><TableCell>Najemnik</TableCell><TableCell>Hiša</TableCell><TableCell>Obdobje</TableCell><TableCell>Status oddaje</TableCell><TableCell align="center">Status obračuna</TableCell><TableCell align="center">Obračun</TableCell></TableRow></TableHead>
-            <TableBody>
-              {filtrirane.slice(prikazanaStran * steviloVrstic, (prikazanaStran + 1) * steviloVrstic).map((v) => {
-                const { naziv, barva, Ikona } = STATUSI[v.status];
-                return (
-                  <TableRow key={v.id} hover sx={{ bgcolor: v.status === 'manjka' ? 'rgba(245, 158, 11, 0.045)' : undefined }}>
-                    <TableCell component="th" scope="row" sx={{ fontWeight: 600 }}>{v.soba}</TableCell>
-                    <TableCell sx={{ color: 'text.secondary' }}>{v.najemnik}</TableCell>
-                    <TableCell sx={{ textTransform: 'capitalize' }}>{v.tip_hise ? `${v.tip_hise} hiša` : '—'}</TableCell>
-                    <TableCell>{imenaMesecov[v.mesec - 1]} {v.leto}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Tooltip title={v.status === 'oddano' ? opisOddaje(v.datum_oddaje) : ''} describeChild arrow>
-                          <Chip size="small" variant="outlined" icon={<Ikona />} label={naziv} color={barva} tabIndex={v.status === 'oddano' ? 0 : undefined} sx={{ flexShrink: 0 }} />
-                        </Tooltip>
-                        {v.status === 'ni_potrebno' && <Tooltip title={v.razlog} describeChild>
-                          <Typography component="span" variant="caption" noWrap sx={{ color: 'text.secondary', minWidth: 0 }}>{v.razlog}</Typography>
-                        </Tooltip>}
-                      </Box>
-                    </TableCell>
-                    <TableCell align="center">{v.placano == null ? '—' : <Chip size="small" variant="outlined" label={v.placano ? 'Potrjeno' : 'Odprto'} color={v.placano ? 'success' : 'warning'} />}</TableCell>
-                    <TableCell align="center">{v.status === 'oddano' ? <Tooltip title="Poglej obračun"><IconButton size="small" color="primary" aria-label={`Poglej obračun za sobo ${v.soba}`} onClick={() => odpriObracune(v, { mesec: v.mesec, leto: v.leto })}><VisibilityOutlinedIcon sx={{ fontSize: 18 }} /></IconButton></Tooltip> : '—'}</TableCell>
-                  </TableRow>
-                );
-              })}
-              {filtrirane.length === 0 && <TableRow><TableCell colSpan={7} sx={{ py: 2, textAlign: 'center' }}><Typography variant="body2" sx={{
-                color: "text.secondary"
-              }}>Ni zadetkov. Poskusi drug status, hišo ali iskalni niz.</Typography><Button sx={{ mt: 0.5 }} size="small" onClick={() => { setIskanje(''); setStatus('vsi'); setHisa(''); setSobaId(''); setStran(0); }}>Počisti filtre</Button></TableCell></TableRow>}
-            </TableBody>
-          </Table>
-        </TableContainer>
-          <TablePagination component="div" count={filtrirane.length} page={prikazanaStran} onPageChange={(_, nova) => setStran(nova)} rowsPerPage={steviloVrstic} rowsPerPageOptions={[25, 50, 100]} onRowsPerPageChange={(e) => spremeniFilter(setSteviloVrstic, Number(e.target.value))} labelRowsPerPage="Vrstic na stran:" labelDisplayedRows={({ from, to, count }) => `${from}–${to} od ${count}`} getItemAriaLabel={(type) => type === 'previous' ? 'Prejšnja stran' : 'Naslednja stran'} sx={{ flexShrink: 0, minHeight: 52, bgcolor: '#f8fafc', borderTop: 1, borderColor: 'divider', '& .MuiTablePagination-toolbar': { minHeight: 52 }, '& .MuiTablePagination-displayedRows': { my: 0 } }} />
-        </Paper>
+      <Box className="tabela-polna" sx={ADMIN_TABELA_FLEKS_SX}>
+        <DataGrid
+          aria-label={letniPogled ? `Letni pregled oddaj ${obdobje.leto}` : `Oddaja obračunov za ${nazivObdobja}`}
+          sx={ADMIN_DATAGRID_FLEKS_SX}
+          key={pogled}
+          rows={filtrirane}
+          columns={letniPogled ? letniStolpci : stolpci}
+          density="compact"
+          rowHeight={56}
+          columnHeaderHeight={48}
+          disableRowSelectionOnClick
+          localeText={lokalizacijaMreze}
+          paginationModel={{ page: prikazanaStran, pageSize: steviloVrstic }}
+          onPaginationModelChange={({ page, pageSize }) => {
+            setStran(pageSize === steviloVrstic ? page : 0);
+            setSteviloVrstic(pageSize);
+          }}
+          pageSizeOptions={[25, 50, 100]}
+          slots={PREGLED_OVERLAY_SLOTS}
+          slotProps={{ noRowsOverlay: { onPocisti: () => {
+            setIskanje(''); setStatus('vsi'); setHisa(''); setSobaId(''); setStran(0);
+          } } }}
+        />
       </Box>
     </Stack>
   );

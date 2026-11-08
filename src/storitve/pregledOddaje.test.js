@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pripraviPregledOddaje, pripraviPregledOddajeZaMesece } from './pregledOddaje.js';
+import { pripraviLetniPregledOddaj, pripraviPregledOddaje, pripraviPregledOddajeZaMesece } from './pregledOddaje.js';
 
 const soba = { id: 's1', ime_sobe: 'Soba 1', tip_hise: 'velika', aktivna: true };
 const najemnik = { id: 'u1', soba_id: 's1', ime: 'Ana', priimek: 'Novak', aktiven: true, admin: false, uporabnik_od: '2026-09-15' };
@@ -132,4 +132,67 @@ test('multi-month history includes only the saved month for an unassigned tenant
   assert.equal(vrstice.length, 3);
   assert.deepEqual(vrstice.filter((v) => v.status === 'oddano').map((v) => v.mesec), [5]);
   assert.deepEqual(vrstice.filter((v) => v.status === 'ni_potrebno').map((v) => v.mesec), [6, 4]);
+});
+
+
+function letni(spremembe = {}) {
+  return pripraviLetniPregledOddaj({ sobe: [soba], uporabniki: [najemnik], placila: [], leto: 2026,
+    trenutno: { mesec: 11, leto: 2026 }, ...spremembe });
+}
+
+test('annual matrix has twelve months and distinguishes missing, submitted and unnecessary months', () => {
+  const [v] = letni({ placila: [{ ...placilo, mesec: 10 }] });
+  assert.equal(Object.keys(v.meseci).length, 12);
+  assert.equal(v.meseci[9].status, 'ni_potrebno');
+  assert.equal(v.meseci[10].status, 'oddano');
+  assert.equal(v.meseci[10].placano, false);
+  assert.equal(v.meseci[11].status, 'manjka');
+  assert.equal(v.meseci[12].status, 'ni_potrebno');
+  assert.equal(v.meseci[12].razlog, 'Prihodnji mesec');
+  assert.equal(v.manjka, 1);
+  assert.equal(v.oddano, 1);
+  assert.equal(v.status, 'manjka');
+});
+
+test('annual matrix includes only current active tenants assigned to active rooms', () => {
+  for (const sprememba of [{ aktiven: false }, { admin: true }, { soba_id: null }, { soba_id: 'other' }]) {
+    assert.equal(letni({ uporabniki: [{ ...najemnik, ...sprememba }], placila: [placilo] }).length, 0);
+  }
+  assert.equal(letni({ sobe: [{ ...soba, aktivna: false }], placila: [placilo] }).length, 0);
+  assert.equal(letni({ uporabniki: [] }).length, 0);
+});
+
+test('previous tenant and room submissions never fill a current tenant matrix box', () => {
+  const [v] = letni({ placila: [
+    { ...placilo, uporabnik_id: 'former' },
+    { ...placilo, soba_id: 'other' },
+    { ...placilo, leto: 2025 }
+  ] });
+  assert.equal(v.meseci[11].status, 'manjka');
+  assert.equal(v.oddano, 0);
+});
+
+test('completed matrix boxes preserve exact invoice navigation ownership and month', () => {
+  const [v] = letni({ placila: [{ ...placilo, placano: true, datum_izracuna: '2026-11-05T10:00:00Z' }] });
+  const oddaja = v.meseci[11];
+  assert.equal(oddaja.status, 'oddano');
+  assert.equal(oddaja.soba_id, 's1');
+  assert.equal(oddaja.uporabnik_id, 'u1');
+  assert.equal(oddaja.mesec, 11);
+  assert.equal(oddaja.leto, 2026);
+  assert.equal(oddaja.placano, true);
+  assert.equal(oddaja.datum_oddaje, '2026-11-05T10:00:00Z');
+});
+
+test('annual completion excludes future and pre-tenancy months, and does not merge co-tenants', () => {
+  const uporabniki = [najemnik, { ...najemnik, id: 'u2', ime: 'Bojan' }];
+  const vrstice = letni({ uporabniki, placila: [{ ...placilo, mesec: 10 }, placilo] });
+  const ana = vrstice.find((v) => v.uporabnik_id === 'u1');
+  const bojan = vrstice.find((v) => v.uporabnik_id === 'u2');
+  assert.equal(ana.status, 'oddano');
+  assert.equal(ana.manjka, 0);
+  assert.equal(bojan.status, 'manjka');
+  assert.equal(bojan.manjka, 2);
+  const [prej] = letni({ leto: 2025 });
+  assert.equal(prej.status, 'ni_potrebno');
 });
